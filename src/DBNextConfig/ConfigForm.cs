@@ -24,6 +24,7 @@ public class ConfigForm : Form
     private ComboBox _cmbTargetDisplay = null!;
     private TextBox _txtMultiDisplayList = null!;
     private ComboBox _cmbWindowMode = null!;
+    private NumericUpDown _numWindowMarginTop = null!;
     
     // Polling
     private NumericUpDown _numPollMs = null!;
@@ -238,7 +239,7 @@ public class ConfigForm : Form
         
         // === Sezione Display ===
         var grpDisplay = CreateGroupBox("🖥️ Display");
-        var displayLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, AutoSize = true };
+        var displayLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, AutoSize = true };
         
         displayLayout.Controls.Add(new Label { Text = "Modalità schermo:", AutoSize = true }, 0, 0);
         _cmbScreenMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
@@ -259,6 +260,10 @@ public class ConfigForm : Form
         _cmbWindowMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         _cmbWindowMode.Items.AddRange(new[] { "borderless", "fullscreen", "windowed" });
         displayLayout.Controls.Add(_cmbWindowMode, 1, 3);
+        
+        displayLayout.Controls.Add(new Label { Text = "Margine superiore (px):", AutoSize = true }, 0, 4);
+        _numWindowMarginTop = new NumericUpDown { Minimum = 0, Maximum = 500, Value = 0, Width = 100 };
+        displayLayout.Controls.Add(_numWindowMarginTop, 1, 4);
         
         grpDisplay.Controls.Add(displayLayout);
         mainPanel.Controls.Add(grpDisplay);
@@ -422,6 +427,7 @@ public class ConfigForm : Form
                 _cmbTargetDisplay.SelectedIndex = _settings.TargetDisplayIndex;
             _txtMultiDisplayList.Text = _settings.MultiDisplayList;
             _cmbWindowMode.SelectedItem = _settings.WindowMode;
+            _numWindowMarginTop.Value = Math.Max(0, Math.Min(500, _settings.WindowMarginTop));
             
             // Polling
             _numPollMs.Value = _settings.PollMs;
@@ -569,6 +575,7 @@ public class ConfigForm : Form
             _settings.TargetDisplayIndex = _cmbTargetDisplay.SelectedIndex;
             _settings.MultiDisplayList = _txtMultiDisplayList.Text;
             _settings.WindowMode = _cmbWindowMode.SelectedItem?.ToString() ?? "borderless";
+            _settings.WindowMarginTop = (int)_numWindowMarginTop.Value;
             
             // Polling
             _settings.PollMs = (int)_numPollMs.Value;

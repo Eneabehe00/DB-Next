@@ -62,6 +62,7 @@ public static class Database
                     window_mode VARCHAR(20) DEFAULT 'borderless',
                     window_width INT DEFAULT 0,
                     window_height INT DEFAULT 0,
+                    window_margin_top INT DEFAULT 0,
                     number_font_family VARCHAR(100) DEFAULT 'Arial Black',
                     number_font_size INT DEFAULT 0,
                     number_font_bold TINYINT(1) DEFAULT 1,
@@ -242,7 +243,7 @@ public static class Database
                 SELECT id, media_path, media_type, media_fit, poll_ms,
                        layout_left_pct, layout_right_pct, screen_mode,
                        target_display_index, multi_display_list, window_mode,
-                       window_width, window_height, number_font_family,
+                       window_width, window_height, window_margin_top, number_font_family,
                        number_font_size, number_font_bold, number_color,
                        number_bg_color, number_label_text, number_label_color,
                        number_label_size, number_label_position, number_label_offset,
@@ -267,19 +268,20 @@ public static class Database
                     WindowMode = reader.IsDBNull(10) ? "borderless" : reader.GetString(10),
                     WindowWidth = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
                     WindowHeight = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
-                    NumberFontFamily = reader.IsDBNull(13) ? "Arial Black" : reader.GetString(13),
-                    NumberFontSize = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
-                    NumberFontBold = reader.IsDBNull(15) ? true : reader.GetInt32(15) == 1,
-                    NumberColor = reader.IsDBNull(16) ? "#FFC832" : reader.GetString(16),
-                    NumberBgColor = reader.IsDBNull(17) ? "#14141E" : reader.GetString(17),
-                    NumberLabelText = reader.IsDBNull(18) ? "" : reader.GetString(18),
-                    NumberLabelColor = reader.IsDBNull(19) ? "#FFFFFF" : reader.GetString(19),
-                    NumberLabelSize = reader.IsDBNull(20) ? 0 : reader.GetInt32(20),
-                    NumberLabelPosition = reader.IsDBNull(21) ? "top" : reader.GetString(21),
-                    NumberLabelOffset = reader.IsDBNull(22) ? 0 : reader.GetInt32(22),
-                    MediaFolderMode = reader.IsDBNull(23) ? false : reader.GetInt32(23) == 1,
-                    SlideshowIntervalMs = reader.IsDBNull(24) ? 5000 : reader.GetInt32(24),
-                    UpdatedAt = reader.IsDBNull(25) ? DateTime.Now : reader.GetDateTime(25)
+                    WindowMarginTop = reader.IsDBNull(13) ? 0 : reader.GetInt32(13),
+                    NumberFontFamily = reader.IsDBNull(14) ? "Arial Black" : reader.GetString(14),
+                    NumberFontSize = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+                    NumberFontBold = reader.IsDBNull(16) ? true : reader.GetInt32(16) == 1,
+                    NumberColor = reader.IsDBNull(17) ? "#FFC832" : reader.GetString(17),
+                    NumberBgColor = reader.IsDBNull(18) ? "#14141E" : reader.GetString(18),
+                    NumberLabelText = reader.IsDBNull(19) ? "" : reader.GetString(19),
+                    NumberLabelColor = reader.IsDBNull(20) ? "#FFFFFF" : reader.GetString(20),
+                    NumberLabelSize = reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
+                    NumberLabelPosition = reader.IsDBNull(22) ? "top" : reader.GetString(22),
+                    NumberLabelOffset = reader.IsDBNull(23) ? 0 : reader.GetInt32(23),
+                    MediaFolderMode = reader.IsDBNull(24) ? false : reader.GetInt32(24) == 1,
+                    SlideshowIntervalMs = reader.IsDBNull(25) ? 5000 : reader.GetInt32(25),
+                    UpdatedAt = reader.IsDBNull(26) ? DateTime.Now : reader.GetDateTime(26)
                 };
             }
         }
@@ -315,6 +317,7 @@ public static class Database
                     window_mode = @window_mode,
                     window_width = @window_width,
                     window_height = @window_height,
+                    window_margin_top = @window_margin_top,
                     number_font_family = @number_font_family,
                     number_font_size = @number_font_size,
                     number_font_bold = @number_font_bold,
@@ -341,6 +344,7 @@ public static class Database
             cmd.Parameters.AddWithValue("@window_mode", settings.WindowMode ?? "borderless");
             cmd.Parameters.AddWithValue("@window_width", settings.WindowWidth);
             cmd.Parameters.AddWithValue("@window_height", settings.WindowHeight);
+            cmd.Parameters.AddWithValue("@window_margin_top", settings.WindowMarginTop);
             cmd.Parameters.AddWithValue("@number_font_family", settings.NumberFontFamily ?? "Arial Black");
             cmd.Parameters.AddWithValue("@number_font_size", settings.NumberFontSize);
             cmd.Parameters.AddWithValue("@number_font_bold", settings.NumberFontBold ? 1 : 0);

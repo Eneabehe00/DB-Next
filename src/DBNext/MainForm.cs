@@ -163,6 +163,7 @@ public class MainForm : Form
             try
             {
             await LoadSettingsAsync();
+            ApplyWindowBounds();
             ApplyNumberStyle();
 
             this.Show();
@@ -250,7 +251,7 @@ public class MainForm : Form
             _pollTimer.Interval = Math.Max(100, _settings.PollMs > 0 ? _settings.PollMs : 1000);
             _slideshowTimer.Interval = Math.Max(1000, _settings.SlideshowIntervalMs);
             
-            Logger.Info($"Settings caricati: Layout {_settings.LayoutLeftPct}/{_settings.LayoutRightPct}, Window: {_settings.WindowMode}");
+            Logger.Info($"Settings caricati: Layout {_settings.LayoutLeftPct}/{_settings.LayoutRightPct}, Window: {_settings.WindowMode}, MarginTop: {_settings.WindowMarginTop}");
         }
         catch (Exception ex)
         {
@@ -294,7 +295,42 @@ public class MainForm : Form
             Logger.Error($"Stack trace: {ex.StackTrace}");
         }
     }
-    
+
+    private void ApplyWindowBounds()
+    {
+        Logger.Info("ApplyWindowBounds: Inizio");
+
+        try
+        {
+            // Sempre fullscreen senza bordi sul monitor target
+            this.FormBorderStyle = FormBorderStyle.None;
+
+            // Applica margine superiore se configurato (per banner/overlay)
+            var bounds = _targetScreen.Bounds;
+            if (_settings.WindowMarginTop > 0)
+            {
+                bounds = new Rectangle(
+                    bounds.X,
+                    bounds.Y + _settings.WindowMarginTop,
+                    bounds.Width,
+                    bounds.Height - _settings.WindowMarginTop
+                );
+                Logger.Info($"Applicato margine superiore di {_settings.WindowMarginTop}px");
+            }
+
+            this.Bounds = bounds;
+            this.TopMost = false;
+
+            Logger.Info($"Finestra impostata a: {this.Bounds.Width}x{this.Bounds.Height} at ({this.Bounds.X},{this.Bounds.Y})");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore ApplyWindowBounds: {ex.Message}");
+        }
+
+        Logger.Info("ApplyWindowBounds: Completato");
+    }
+
     private async Task PollDatabaseAsync()
     {
         if (_isClosing) return;
@@ -306,12 +342,18 @@ public class MainForm : Form
                 var newSettings = await Database.GetSettingsAsync();
                 if (newSettings.UpdatedAt != _settings.UpdatedAt)
                 {
+                    var oldMarginTop = _settings.WindowMarginTop;
                     _settings = newSettings;
                     _pollTimer.Interval = Math.Max(100, _settings.PollMs);
                     _slideshowTimer.Interval = Math.Max(1000, _settings.SlideshowIntervalMs);
-                    
+
                     this.Invoke(() =>
                     {
+                        // Se il margine superiore è cambiato, ricalcola i bounds
+                        if (oldMarginTop != _settings.WindowMarginTop)
+                        {
+                            ApplyWindowBounds();
+                        }
                         ApplyNumberStyle();
                         UpdateLayout();
                         LoadMedia();
@@ -342,9 +384,23 @@ public class MainForm : Form
         {
             // Semplificazione: sempre fullscreen senza bordi sul monitor target
             this.FormBorderStyle = FormBorderStyle.None;
-            this.Bounds = _targetScreen.Bounds;
+
+            // Applica margine superiore se configurato (per banner/overlay)
+            var bounds = _targetScreen.Bounds;
+            if (_settings.WindowMarginTop > 0)
+            {
+                bounds = new Rectangle(
+                    bounds.X,
+                    bounds.Y + _settings.WindowMarginTop,
+                    bounds.Width,
+                    bounds.Height - _settings.WindowMarginTop
+                );
+                Logger.Info($"Applicato margine superiore di {_settings.WindowMarginTop}px");
+            }
+
+            this.Bounds = bounds;
             this.TopMost = false;
-            
+
             Logger.Info($"Finestra impostata a: {this.Bounds.Width}x{this.Bounds.Height} at ({this.Bounds.X},{this.Bounds.Y})");
         }
         catch (Exception ex)

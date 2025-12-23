@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     window_mode VARCHAR(20) DEFAULT 'borderless' COMMENT 'Finestra: fullscreen, borderless, windowed',
     window_width INT DEFAULT 0 COMMENT 'Larghezza finestra personalizzata in pixel (0=auto)',
     window_height INT DEFAULT 0 COMMENT 'Altezza finestra personalizzata in pixel (0=auto)',
+    window_margin_top INT DEFAULT 0 COMMENT 'Margine superiore in pixel (per banner/overlay)',
 
     -- Personalizzazione Numero
     number_font_family VARCHAR(100) DEFAULT 'Arial Black' COMMENT 'Font del numero',
@@ -242,6 +243,15 @@ BEGIN
           AND COLUMN_NAME = 'window_height'
     ) THEN
         ALTER TABLE queue_settings ADD COLUMN window_height INT DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'window_margin_top'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN window_margin_top INT DEFAULT 0;
     END IF;
 
     SELECT 'Schema aggiornato con successo' AS status;

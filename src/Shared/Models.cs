@@ -38,6 +38,7 @@ public class QueueSettings
     public string WindowMode { get; set; } = "borderless"; // fullscreen, borderless, windowed
     public int WindowWidth { get; set; } = 0; // 0 = auto
     public int WindowHeight { get; set; } = 0; // 0 = auto
+    public int WindowMarginTop { get; set; } = 0; // Margine superiore in pixel (per banner/overlay)
     
     // Personalizzazione Numero
     public string NumberFontFamily { get; set; } = "Arial Black";
