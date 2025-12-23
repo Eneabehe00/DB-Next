@@ -1,0 +1,43 @@
+# Build results
+bin/
+obj/
+publish/
+out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs
+logs/
+*.log
+
+# Config (contains passwords)
+config.ini
+
+# OS generated
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# NuGet
+packages/
+*.nupkg
+
+# Test results
+TestResults/
+
+# Build
+*.exe
+*.dll
+*.pdb
+

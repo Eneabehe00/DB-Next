@@ -1,0 +1,26 @@
+# DB-Next Configuration
+# =====================
+# Configurazione connessione MySQL
+# Copia questo file come "config.ini" e modifica i valori
+
+# Server MySQL (IP o hostname)
+server=192.168.1.56
+
+# Porta MySQL (default: 3306)
+port=3306
+
+# Nome database (usa il database esistente della bilancia)
+database=sys_datos
+
+# Utente MySQL
+user=user
+
+# Password MySQL
+password=dibal
+
+# NOTE:
+# - Il database sys_datos esiste già nella bilancia
+# - Esegui sql/install.sql per installare/aggiornare le tabelle
+# - Per bilance slave, usa l'IP della bilancia master come 'server'
+# - Lo script gestisce automaticamente nuove installazioni e aggiornamenti
+
