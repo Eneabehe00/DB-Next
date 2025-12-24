@@ -31,11 +31,13 @@ Sistema **Saltacoda** ultra-leggero per PC industriali (bilance).
 |------|-------------|
 | `DB-Next.exe` | Applicazione principale saltacoda (fullscreen) |
 | `DB-NextConfig.exe` | Configuratore grafico |
+| `DBNextOperator.exe` | Impostazioni operatore con tastiera touch |
 | `DB-NextCLI.exe` | Utility CLI per batch |
 | `NEXT.bat` | Incrementa numero (99→0) |
 | `PREV.bat` | Decrementa numero (0→99) |
 | `SET.bat` | Imposta numero manualmente |
 | `EDIT.bat` | Apre configuratore |
+| `OPERATOR.bat` | Apre impostazioni operatore |
 | `config.ini` | Configurazione connessione DB |
 
 ## 🚀 Installazione
@@ -99,6 +101,7 @@ dotnet publish -c Release -o ./publish
 Copia nella cartella di destinazione:
 - `DB-Next.exe`
 - `DB-NextConfig.exe`
+- `DBNextOperator.exe`
 - `DB-NextCLI.exe`
 - `config.ini`
 - Tutti i file `.bat`
@@ -123,6 +126,18 @@ DB-NextConfig.exe
 # oppure
 EDIT.bat
 ```
+
+### Impostazioni Operatore
+
+```bash
+DBNextOperator.exe
+# oppure
+OPERATOR.bat
+```
+
+Interfaccia touch-friendly per:
+- Controllo numero corrente con tastiera numerica
+- Impostazioni media con scheduler programmato
 
 ### Controllo Numero
 

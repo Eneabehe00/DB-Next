@@ -595,55 +595,100 @@ public class MainForm : Form
             _videoView.Visible = false;
             _pictureBox.Visible = true;
 
-            Logger.Info($"LoadMedia: Caricamento media '{_settings.MediaPath}' tipo '{_settings.MediaType}'");
+            // === LOGICA SCHEDULER MEDIA ===
+            // Determina quali impostazioni media usare (normali o scheduler)
+            string activeMediaPath;
+            string activeMediaType;
+            string activeMediaFit;
+            bool activeMediaFolderMode;
+            int activeSlideshowIntervalMs;
+
+            DateTime oggi = DateTime.Today;
+            bool schedulerAttivo = _settings.MediaSchedulerEnabled &&
+                                   oggi >= _settings.MediaSchedulerStartDate &&
+                                   oggi <= _settings.MediaSchedulerEndDate;
+
+            if (schedulerAttivo)
+            {
+                // Usa impostazioni SCHEDULER
+                activeMediaPath = _settings.MediaSchedulerPath ?? "";
+                activeMediaType = _settings.MediaSchedulerType ?? "image";
+                activeMediaFit = _settings.MediaSchedulerFit ?? "cover";
+                activeMediaFolderMode = _settings.MediaSchedulerFolderMode;
+                activeSlideshowIntervalMs = _settings.MediaSchedulerIntervalMs;
+
+                Logger.Info($"LoadMedia: Scheduler ATTIVO - Data corrente {oggi:yyyy-MM-dd} è nel range [{_settings.MediaSchedulerStartDate:yyyy-MM-dd} - {_settings.MediaSchedulerEndDate:yyyy-MM-dd}]");
+                Logger.Info($"LoadMedia: Uso impostazioni scheduler - Path: '{activeMediaPath}', Type: '{activeMediaType}'");
+            }
+            else
+            {
+                // Usa impostazioni NORMALI
+                activeMediaPath = _settings.MediaPath ?? "";
+                activeMediaType = _settings.MediaType ?? "image";
+                activeMediaFit = _settings.MediaFit ?? "cover";
+                activeMediaFolderMode = _settings.MediaFolderMode;
+                activeSlideshowIntervalMs = _settings.SlideshowIntervalMs;
+
+                if (_settings.MediaSchedulerEnabled)
+                {
+                    Logger.Info($"LoadMedia: Scheduler abilitato ma NON attivo - Data corrente {oggi:yyyy-MM-dd} NON è nel range [{_settings.MediaSchedulerStartDate:yyyy-MM-dd} - {_settings.MediaSchedulerEndDate:yyyy-MM-dd}]");
+                }
+                else
+                {
+                    Logger.Info("LoadMedia: Scheduler non abilitato - uso impostazioni normali");
+                }
+                Logger.Info($"LoadMedia: Uso impostazioni normali - Path: '{activeMediaPath}', Type: '{activeMediaType}'");
+            }
+
+            Logger.Info($"LoadMedia: Caricamento media '{activeMediaPath}' tipo '{activeMediaType}'");
             _pictureBox.Image?.Dispose();
             _pictureBox.Image = null;
-            
-            if (string.IsNullOrEmpty(_settings.MediaPath))
+
+            if (string.IsNullOrEmpty(activeMediaPath))
             {
                 _pictureBox.BackColor = Color.Black;
                 return;
             }
-            
+
             // Imposta modalità di visualizzazione
-            _pictureBox.SizeMode = _settings.MediaFit?.ToLower() == "contain" 
-                ? PictureBoxSizeMode.Zoom 
+            _pictureBox.SizeMode = activeMediaFit?.ToLower() == "contain"
+                ? PictureBoxSizeMode.Zoom
                 : PictureBoxSizeMode.StretchImage;
-            
+
             // Modalità cartella (slideshow)
-            if (_settings.MediaFolderMode && Directory.Exists(_settings.MediaPath))
+            if (activeMediaFolderMode && Directory.Exists(activeMediaPath))
             {
-                LoadSlideshow();
+                LoadSlideshow(activeMediaPath, activeSlideshowIntervalMs);
                 return;
             }
             
             // File singolo
-            if (!File.Exists(_settings.MediaPath))
+            if (!File.Exists(activeMediaPath))
             {
                 _pictureBox.BackColor = Color.Black;
                 return;
             }
-            
+
             // File singolo = non è slideshow
             _isPlayingVideoInSlideshow = false;
-            
-            var ext = Path.GetExtension(_settings.MediaPath).ToLower();
-            
-            if (ext == ".gif" || _settings.MediaType == "gif")
+
+            var ext = Path.GetExtension(activeMediaPath).ToLower();
+
+            if (ext == ".gif" || activeMediaType == "gif")
             {
-                _pictureBox.Image = Image.FromFile(_settings.MediaPath);
+                _pictureBox.Image = Image.FromFile(activeMediaPath);
             }
-            else if (IsVideoFile(ext) || _settings.MediaType == "video")
+            else if (IsVideoFile(ext) || activeMediaType == "video")
             {
                 // Riproduci video con LibVLC (loop infinito per file singolo)
-                LoadVideo(_settings.MediaPath);
+                LoadVideo(activeMediaPath);
             }
             else
             {
-                _pictureBox.Image = Image.FromFile(_settings.MediaPath);
+                _pictureBox.Image = Image.FromFile(activeMediaPath);
             }
-            
-            Logger.Info($"Media caricato: {_settings.MediaPath}");
+
+            Logger.Info($"Media caricato: {activeMediaPath}");
         }
         catch (Exception ex)
         {
@@ -652,7 +697,7 @@ public class MainForm : Form
         }
     }
     
-    private void LoadSlideshow()
+    private void LoadSlideshow(string mediaPath, int slideshowIntervalMs)
     {
         try
         {
@@ -660,15 +705,15 @@ public class MainForm : Form
             var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
             var videoExtensions = new[] { ".mp4", ".avi", ".wmv", ".webm", ".mkv", ".mov" };
             var allExtensions = imageExtensions.Concat(videoExtensions).ToArray();
-            
-            _slideshowFiles = Directory.GetFiles(_settings.MediaPath)
+
+            _slideshowFiles = Directory.GetFiles(mediaPath)
                 .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLower()))
                 .OrderBy(f => f)
                 .ToArray();
-            
+
             if (_slideshowFiles.Length == 0)
             {
-                Logger.Warn($"Nessun file media trovato in: {_settings.MediaPath}");
+                Logger.Warn($"Nessun file media trovato in: {mediaPath}");
                 _pictureBox.BackColor = Color.Black;
                 return;
             }
@@ -678,11 +723,11 @@ public class MainForm : Form
             
             if (_slideshowFiles.Length > 1)
             {
-                _slideshowTimer.Interval = Math.Max(1000, _settings.SlideshowIntervalMs);
+                _slideshowTimer.Interval = Math.Max(1000, slideshowIntervalMs);
                 _slideshowTimer.Start();
             }
-            
-            Logger.Info($"Slideshow avviato: {_slideshowFiles.Length} file (immagini e video), intervallo {_settings.SlideshowIntervalMs}ms");
+
+            Logger.Info($"Slideshow avviato: {_slideshowFiles.Length} file (immagini e video), intervallo {slideshowIntervalMs}ms");
         }
         catch (Exception ex)
         {

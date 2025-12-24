@@ -35,6 +35,7 @@ if errorlevel 1 (
 
 dotnet publish src\DBNextConfig\DBNextConfig.csproj -c Release -o publish --self-contained false
 dotnet publish src\DBNextCLI\DBNextCLI.csproj -c Release -o publish --self-contained false
+dotnet publish src\DBNextOperator\DBNextOperator.csproj -c Release -o publish --self-contained false
 echo       OK - Eseguibili creati
 echo.
 
@@ -52,9 +53,10 @@ echo   BUILD COMPLETATO CON SUCCESSO!
 echo ================================================================================
 echo.
 echo File pronti in: Deployment\
-echo   - DB-Next.exe       (Applicazione principale)
-echo   - DB-NextConfig.exe (Configuratore)
-echo   - DB-NextCLI.exe    (Tool command-line)
+echo   - DB-Next.exe          (Applicazione principale)
+echo   - DB-NextConfig.exe    (Configuratore)
+echo   - DB-NextCLI.exe       (Tool command-line)
+echo   - DBNextOperator.exe   (Impostazioni Operatore)
 echo.
 echo Puoi ora eseguire: Deployment\DB-Next.exe
 echo.

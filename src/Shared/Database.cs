@@ -289,7 +289,10 @@ public static class Database
                        operator_window_enabled, operator_window_x, operator_window_y,
                        operator_window_width, operator_window_height, operator_monitor_index,
                        operator_bg_color, operator_text_color, operator_font_family, operator_font_size,
-                       operator_always_on_top, operator_label_text, updated_at
+                       operator_always_on_top, operator_label_text,
+                       media_scheduler_enabled, media_scheduler_start_date, media_scheduler_end_date,
+                       media_scheduler_path, media_scheduler_type, media_scheduler_fit,
+                       media_scheduler_folder_mode, media_scheduler_interval_ms, updated_at
                 FROM queue_settings WHERE id = 1", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             
@@ -335,7 +338,15 @@ public static class Database
                     OperatorFontSize = reader.IsDBNull(35) ? 36 : reader.GetInt32(35),
                     OperatorAlwaysOnTop = reader.IsDBNull(36) ? true : reader.GetInt32(36) == 1,
                     OperatorLabelText = reader.IsDBNull(37) ? "TURNO" : reader.GetString(37),
-                    UpdatedAt = reader.IsDBNull(38) ? DateTime.Now : reader.GetDateTime(38)
+                    MediaSchedulerEnabled = reader.IsDBNull(38) ? false : reader.GetInt32(38) == 1,
+                    MediaSchedulerStartDate = reader.IsDBNull(39) ? DateTime.Today : reader.GetDateTime(39),
+                    MediaSchedulerEndDate = reader.IsDBNull(40) ? DateTime.Today.AddDays(1) : reader.GetDateTime(40),
+                    MediaSchedulerPath = reader.IsDBNull(41) ? "" : reader.GetString(41),
+                    MediaSchedulerType = reader.IsDBNull(42) ? "image" : reader.GetString(42),
+                    MediaSchedulerFit = reader.IsDBNull(43) ? "cover" : reader.GetString(43),
+                    MediaSchedulerFolderMode = reader.IsDBNull(44) ? true : reader.GetInt32(44) == 1,
+                    MediaSchedulerIntervalMs = reader.IsDBNull(45) ? 5000 : reader.GetInt32(45),
+                    UpdatedAt = reader.IsDBNull(46) ? DateTime.Now : reader.GetDateTime(46)
                 };
             }
         }
@@ -395,7 +406,15 @@ public static class Database
                     operator_font_family = @operator_font_family,
                     operator_font_size = @operator_font_size,
                     operator_always_on_top = @operator_always_on_top,
-                    operator_label_text = @operator_label_text
+                    operator_label_text = @operator_label_text,
+                    media_scheduler_enabled = @media_scheduler_enabled,
+                    media_scheduler_start_date = @media_scheduler_start_date,
+                    media_scheduler_end_date = @media_scheduler_end_date,
+                    media_scheduler_path = @media_scheduler_path,
+                    media_scheduler_type = @media_scheduler_type,
+                    media_scheduler_fit = @media_scheduler_fit,
+                    media_scheduler_folder_mode = @media_scheduler_folder_mode,
+                    media_scheduler_interval_ms = @media_scheduler_interval_ms
                 WHERE id = 1", conn);
             
             cmd.Parameters.AddWithValue("@media_path", settings.MediaPath ?? "");
@@ -435,7 +454,15 @@ public static class Database
             cmd.Parameters.AddWithValue("@operator_font_size", settings.OperatorFontSize);
             cmd.Parameters.AddWithValue("@operator_always_on_top", settings.OperatorAlwaysOnTop ? 1 : 0);
             cmd.Parameters.AddWithValue("@operator_label_text", settings.OperatorLabelText ?? "TURNO");
-            
+            cmd.Parameters.AddWithValue("@media_scheduler_enabled", settings.MediaSchedulerEnabled ? 1 : 0);
+            cmd.Parameters.AddWithValue("@media_scheduler_start_date", settings.MediaSchedulerStartDate);
+            cmd.Parameters.AddWithValue("@media_scheduler_end_date", settings.MediaSchedulerEndDate);
+            cmd.Parameters.AddWithValue("@media_scheduler_path", settings.MediaSchedulerPath ?? "");
+            cmd.Parameters.AddWithValue("@media_scheduler_type", settings.MediaSchedulerType ?? "image");
+            cmd.Parameters.AddWithValue("@media_scheduler_fit", settings.MediaSchedulerFit ?? "cover");
+            cmd.Parameters.AddWithValue("@media_scheduler_folder_mode", settings.MediaSchedulerFolderMode ? 1 : 0);
+            cmd.Parameters.AddWithValue("@media_scheduler_interval_ms", settings.MediaSchedulerIntervalMs);
+
             await cmd.ExecuteNonQueryAsync();
             Logger.Info("Impostazioni salvate");
             return true;

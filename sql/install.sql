@@ -379,7 +379,82 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN operator_label_text VARCHAR(50) DEFAULT 'TURNO';
     END IF;
 
-    SELECT 'Schema aggiornato con successo - inclusa finestra operatore' AS status;
+    -- Colonne per scheduler media operatore
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_enabled'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_enabled TINYINT(1) DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_start_date'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_start_date DATE;
+        UPDATE queue_settings SET media_scheduler_start_date = CURDATE() WHERE id = 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_end_date'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_end_date DATE;
+        UPDATE queue_settings SET media_scheduler_end_date = DATE_ADD(CURDATE(), INTERVAL 1 DAY) WHERE id = 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_path'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_path VARCHAR(500) DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_type'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_type VARCHAR(20) DEFAULT 'image';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_fit'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_fit VARCHAR(20) DEFAULT 'cover';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_folder_mode'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_folder_mode TINYINT(1) DEFAULT 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'media_scheduler_interval_ms'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN media_scheduler_interval_ms INT DEFAULT 5000;
+    END IF;
+
+    SELECT 'Schema aggiornato con successo - inclusa finestra operatore e scheduler media' AS status;
 END//
 
 DELIMITER ;

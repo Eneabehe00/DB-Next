@@ -68,6 +68,16 @@ public class QueueSettings
     public bool OperatorAlwaysOnTop { get; set; } = true; // Finestra sempre in primo piano
     public string OperatorLabelText { get; set; } = "TURNO"; // Testo etichetta operatore
 
+    // Scheduler Media per Operatore
+    public bool MediaSchedulerEnabled { get; set; } = false; // Abilita/disabilita scheduler media
+    public DateTime MediaSchedulerStartDate { get; set; } = DateTime.Today; // Data inizio schedule
+    public DateTime MediaSchedulerEndDate { get; set; } = DateTime.Today.AddDays(1); // Data fine schedule
+    public string MediaSchedulerPath { get; set; } = ""; // Percorso cartella per schedule
+    public string MediaSchedulerType { get; set; } = "image"; // Tipo media per schedule
+    public string MediaSchedulerFit { get; set; } = "cover"; // Adattamento per schedule
+    public bool MediaSchedulerFolderMode { get; set; } = true; // Modalità cartella per schedule
+    public int MediaSchedulerIntervalMs { get; set; } = 5000; // Intervallo slideshow per schedule
+
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
