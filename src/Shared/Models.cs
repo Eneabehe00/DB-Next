@@ -53,7 +53,21 @@ public class QueueSettings
     public int NumberLabelSize { get; set; } = 0; // 0 = auto (responsive)
     public string NumberLabelPosition { get; set; } = "top"; // top, bottom
     public int NumberLabelOffset { get; set; } = 0; // Offset in pixel dalla posizione (positivo = verso centro)
-    
+
+    // Finestra Operatore
+    public bool OperatorWindowEnabled { get; set; } = false; // Abilita/disabilita finestra operatore
+    public int OperatorWindowX { get; set; } = 50; // Posizione X della finestra operatore
+    public int OperatorWindowY { get; set; } = 50; // Posizione Y della finestra operatore
+    public int OperatorWindowWidth { get; set; } = 200; // Larghezza finestra operatore
+    public int OperatorWindowHeight { get; set; } = 80; // Altezza finestra operatore
+    public int OperatorMonitorIndex { get; set; } = 0; // Indice monitor per finestra operatore
+    public string OperatorBgColor { get; set; } = "#000000"; // Sfondo finestra operatore
+    public string OperatorTextColor { get; set; } = "#FFFFFF"; // Colore testo finestra operatore
+    public string OperatorFontFamily { get; set; } = "Arial Black"; // Font finestra operatore
+    public int OperatorFontSize { get; set; } = 36; // Dimensione font finestra operatore
+    public bool OperatorAlwaysOnTop { get; set; } = true; // Finestra sempre in primo piano
+    public string OperatorLabelText { get; set; } = "TURNO"; // Testo etichetta operatore
+
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 

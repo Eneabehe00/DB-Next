@@ -24,6 +24,9 @@ public class MainForm : Form
     private int _lastNumber = -1;
     private DateTime _lastSettingsCheck = DateTime.MinValue;
     private bool _isClosing = false;
+
+    // Finestra operatore
+    private OperatorDisplayForm? _operatorForm;
     
     // LibVLC
     private LibVLC? _libVLC;
@@ -133,7 +136,8 @@ public class MainForm : Form
             this.Invoke(() =>
             {
                 Logger.Info("Video terminato, passo alla slide successiva");
-                NextSlide();
+                // Usa BeginInvoke per evitare deadlock e race conditions
+                this.BeginInvoke(() => NextSlide());
             });
         }
     }
@@ -171,6 +175,7 @@ public class MainForm : Form
 
             UpdateLayout();
             LoadMedia();
+            UpdateOperatorWindow();
             }
             catch (Exception ex)
             {
@@ -357,6 +362,7 @@ public class MainForm : Form
                         ApplyNumberStyle();
                         UpdateLayout();
                         LoadMedia();
+                        UpdateOperatorWindow();
                     });
                 }
                 _lastSettingsCheck = DateTime.Now;
@@ -589,12 +595,6 @@ public class MainForm : Form
             _videoView.Visible = false;
             _pictureBox.Visible = true;
 
-            // Ferma il video se in riproduzione
-            if (_mediaPlayer != null && _mediaPlayer.IsPlaying)
-            {
-                _mediaPlayer.Stop();
-            }
-
             Logger.Info($"LoadMedia: Caricamento media '{_settings.MediaPath}' tipo '{_settings.MediaType}'");
             _pictureBox.Image?.Dispose();
             _pictureBox.Image = null;
@@ -698,13 +698,7 @@ public class MainForm : Form
         {
             var path = _slideshowFiles[_currentSlideIndex];
             var ext = Path.GetExtension(path).ToLower();
-            
-            // Ferma video precedente se in riproduzione
-            if (_mediaPlayer != null && _mediaPlayer.IsPlaying)
-            {
-                _mediaPlayer.Stop();
-            }
-            
+
             // Controlla se è un video
             if (IsVideoFile(ext))
             {
@@ -773,35 +767,44 @@ public class MainForm : Form
                 ShowVideoPlaceholder(videoPath);
                 return;
             }
-            
+
             _pictureBox.Visible = false;
             _videoView.Visible = true;
-            
+
+            // Aspetta che il player sia pronto (non stia finendo un video)
+            // per evitare race conditions durante la transizione
+            if (_mediaPlayer.State == VLCState.Ended || _mediaPlayer.State == VLCState.Stopped)
+            {
+                // Piccola pausa per permettere al sistema di stabilizzarsi
+                System.Threading.Thread.Sleep(100);
+            }
+
             // Crea media da file
             using var media = new Media(_libVLC, new Uri(videoPath));
-            
+
             // Loop solo se NON siamo in modalità slideshow
             if (!_isPlayingVideoInSlideshow)
             {
                 media.AddOption(":input-repeat=65535"); // Loop infinito
             }
             // Se siamo in slideshow, il video va una sola volta e poi passa alla slide successiva
-            
+
             // Imposta aspect ratio in base a MediaFit
             var aspectRatio = _settings.MediaFit?.ToLower() == "contain" ? "" : "16:9";
-            
+
             _mediaPlayer.Media = media;
             _mediaPlayer.AspectRatio = aspectRatio;
             _mediaPlayer.Scale = 0; // 0 = fit to window
-            
+
             // Avvia riproduzione
             _mediaPlayer.Play();
-            
+
             Logger.Info($"Video caricato con LibVLC: {videoPath} (Loop: {!_isPlayingVideoInSlideshow})");
         }
         catch (Exception ex)
         {
             Logger.Error($"Errore caricamento video: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
             ShowVideoPlaceholder(videoPath);
         }
     }
@@ -886,6 +889,38 @@ public class MainForm : Form
         return Color.FromArgb(255, 200, 50);
     }
     
+    private void UpdateOperatorWindow()
+    {
+        try
+        {
+            if (_settings.OperatorWindowEnabled)
+            {
+                if (_operatorForm == null)
+                {
+                    _operatorForm = new OperatorDisplayForm();
+                }
+
+                _operatorForm.UpdateSettings(_settings);
+
+                if (!_operatorForm.Visible)
+                {
+                    _operatorForm.Show();
+                }
+            }
+            else
+            {
+                if (_operatorForm != null)
+                {
+                    _operatorForm.Hide();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore gestione finestra operatore: {ex.Message}");
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -895,7 +930,11 @@ public class MainForm : Form
             _pictureBox?.Image?.Dispose();
             _numberLabel?.Font?.Dispose();
             _textLabel?.Font?.Dispose();
-            
+
+            // Chiudi finestra operatore
+            _operatorForm?.Hide();
+            _operatorForm?.Dispose();
+
             // Pulisci LibVLC
             _mediaPlayer?.Stop();
             _mediaPlayer?.Dispose();

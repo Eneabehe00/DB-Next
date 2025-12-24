@@ -75,10 +75,48 @@ public static class Database
                     number_label_size INT DEFAULT 0,
                     number_label_position VARCHAR(20) DEFAULT 'top',
                     number_label_offset INT DEFAULT 0,
+                    operator_window_enabled TINYINT(1) DEFAULT 0,
+                    operator_window_x INT DEFAULT 50,
+                    operator_window_y INT DEFAULT 50,
+                    operator_window_width INT DEFAULT 200,
+                    operator_window_height INT DEFAULT 80,
+                    operator_bg_color VARCHAR(20) DEFAULT '#000000',
+                    operator_text_color VARCHAR(20) DEFAULT '#FFFFFF',
+                    operator_font_family VARCHAR(100) DEFAULT 'Arial Black',
+                    operator_font_size INT DEFAULT 36,
+                    operator_always_on_top TINYINT(1) DEFAULT 1,
+                    operator_label_text VARCHAR(50) DEFAULT 'TURNO',
                     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8", conn))
             {
                 await cmd.ExecuteNonQueryAsync();
+            }
+
+            // Migrazione: aggiungi colonne per finestra operatore se non esistono
+            try
+            {
+                await using (var cmd = new MySqlCommand(@"
+                ALTER TABLE queue_settings
+                ADD COLUMN IF NOT EXISTS operator_window_enabled TINYINT(1) DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS operator_window_x INT DEFAULT 50,
+                ADD COLUMN IF NOT EXISTS operator_window_y INT DEFAULT 50,
+                ADD COLUMN IF NOT EXISTS operator_window_width INT DEFAULT 200,
+                ADD COLUMN IF NOT EXISTS operator_window_height INT DEFAULT 80,
+                ADD COLUMN IF NOT EXISTS operator_monitor_index INT DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS operator_bg_color VARCHAR(20) DEFAULT '#000000',
+                ADD COLUMN IF NOT EXISTS operator_text_color VARCHAR(20) DEFAULT '#FFFFFF',
+                ADD COLUMN IF NOT EXISTS operator_font_family VARCHAR(100) DEFAULT 'Arial Black',
+                ADD COLUMN IF NOT EXISTS operator_font_size INT DEFAULT 36,
+                ADD COLUMN IF NOT EXISTS operator_always_on_top TINYINT(1) DEFAULT 1,
+                ADD COLUMN IF NOT EXISTS operator_label_text VARCHAR(50) DEFAULT 'TURNO'", conn))
+                {
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                Logger.Info("Migrazione colonne finestra operatore completata");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Migrazione colonne finestra operatore: {ex.Message}");
             }
             
             // Crea tabella queue_events (sintassi compatibile MySQL 5.x)
@@ -247,7 +285,11 @@ public static class Database
                        number_font_size, number_font_bold, number_color,
                        number_bg_color, number_label_text, number_label_color,
                        number_label_size, number_label_position, number_label_offset,
-                       media_folder_mode, slideshow_interval_ms, updated_at
+                       media_folder_mode, slideshow_interval_ms,
+                       operator_window_enabled, operator_window_x, operator_window_y,
+                       operator_window_width, operator_window_height, operator_monitor_index,
+                       operator_bg_color, operator_text_color, operator_font_family, operator_font_size,
+                       operator_always_on_top, operator_label_text, updated_at
                 FROM queue_settings WHERE id = 1", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             
@@ -281,7 +323,19 @@ public static class Database
                     NumberLabelOffset = reader.IsDBNull(23) ? 0 : reader.GetInt32(23),
                     MediaFolderMode = reader.IsDBNull(24) ? false : reader.GetInt32(24) == 1,
                     SlideshowIntervalMs = reader.IsDBNull(25) ? 5000 : reader.GetInt32(25),
-                    UpdatedAt = reader.IsDBNull(26) ? DateTime.Now : reader.GetDateTime(26)
+                    OperatorWindowEnabled = reader.IsDBNull(26) ? false : reader.GetInt32(26) == 1,
+                    OperatorWindowX = reader.IsDBNull(27) ? 50 : reader.GetInt32(27),
+                    OperatorWindowY = reader.IsDBNull(28) ? 50 : reader.GetInt32(28),
+                    OperatorWindowWidth = reader.IsDBNull(29) ? 200 : reader.GetInt32(29),
+                    OperatorWindowHeight = reader.IsDBNull(30) ? 80 : reader.GetInt32(30),
+                    OperatorMonitorIndex = reader.IsDBNull(31) ? 0 : reader.GetInt32(31),
+                    OperatorBgColor = reader.IsDBNull(32) ? "#000000" : reader.GetString(32),
+                    OperatorTextColor = reader.IsDBNull(33) ? "#FFFFFF" : reader.GetString(33),
+                    OperatorFontFamily = reader.IsDBNull(34) ? "Arial Black" : reader.GetString(34),
+                    OperatorFontSize = reader.IsDBNull(35) ? 36 : reader.GetInt32(35),
+                    OperatorAlwaysOnTop = reader.IsDBNull(36) ? true : reader.GetInt32(36) == 1,
+                    OperatorLabelText = reader.IsDBNull(37) ? "TURNO" : reader.GetString(37),
+                    UpdatedAt = reader.IsDBNull(38) ? DateTime.Now : reader.GetDateTime(38)
                 };
             }
         }
@@ -329,7 +383,19 @@ public static class Database
                     number_label_color = @number_label_color,
                     number_label_size = @number_label_size,
                     number_label_position = @number_label_position,
-                    number_label_offset = @number_label_offset
+                    number_label_offset = @number_label_offset,
+                    operator_window_enabled = @operator_window_enabled,
+                    operator_window_x = @operator_window_x,
+                    operator_window_y = @operator_window_y,
+                    operator_window_width = @operator_window_width,
+                    operator_window_height = @operator_window_height,
+                    operator_monitor_index = @operator_monitor_index,
+                    operator_bg_color = @operator_bg_color,
+                    operator_text_color = @operator_text_color,
+                    operator_font_family = @operator_font_family,
+                    operator_font_size = @operator_font_size,
+                    operator_always_on_top = @operator_always_on_top,
+                    operator_label_text = @operator_label_text
                 WHERE id = 1", conn);
             
             cmd.Parameters.AddWithValue("@media_path", settings.MediaPath ?? "");
@@ -357,6 +423,18 @@ public static class Database
             cmd.Parameters.AddWithValue("@number_label_size", settings.NumberLabelSize);
             cmd.Parameters.AddWithValue("@number_label_position", settings.NumberLabelPosition ?? "top");
             cmd.Parameters.AddWithValue("@number_label_offset", settings.NumberLabelOffset);
+            cmd.Parameters.AddWithValue("@operator_window_enabled", settings.OperatorWindowEnabled ? 1 : 0);
+            cmd.Parameters.AddWithValue("@operator_window_x", settings.OperatorWindowX);
+            cmd.Parameters.AddWithValue("@operator_window_y", settings.OperatorWindowY);
+            cmd.Parameters.AddWithValue("@operator_window_width", settings.OperatorWindowWidth);
+            cmd.Parameters.AddWithValue("@operator_window_height", settings.OperatorWindowHeight);
+            cmd.Parameters.AddWithValue("@operator_monitor_index", settings.OperatorMonitorIndex);
+            cmd.Parameters.AddWithValue("@operator_bg_color", settings.OperatorBgColor ?? "#000000");
+            cmd.Parameters.AddWithValue("@operator_text_color", settings.OperatorTextColor ?? "#FFFFFF");
+            cmd.Parameters.AddWithValue("@operator_font_family", settings.OperatorFontFamily ?? "Arial Black");
+            cmd.Parameters.AddWithValue("@operator_font_size", settings.OperatorFontSize);
+            cmd.Parameters.AddWithValue("@operator_always_on_top", settings.OperatorAlwaysOnTop ? 1 : 0);
+            cmd.Parameters.AddWithValue("@operator_label_text", settings.OperatorLabelText ?? "TURNO");
             
             await cmd.ExecuteNonQueryAsync();
             Logger.Info("Impostazioni salvate");

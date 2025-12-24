@@ -10,6 +10,7 @@
 -- 2. Aggiunge colonne mancanti (aggiornamento sicuro)
 -- 3. Inserisce dati di default
 -- 4. Crea views e stored procedures
+-- 5. Supporta finestra operatore (aggiornamenti automatici)
 -- ============================================
 
 -- Verifica di essere nel database corretto
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS queue_state (
 
 -- Tabella: queue_settings
 -- Configurazione display e comportamento
+-- Include impostazioni per finestra operatore
 -- Contiene sempre una sola riga con id=1
 CREATE TABLE IF NOT EXISTS queue_settings (
     id INT NOT NULL DEFAULT 1,
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     window_mode VARCHAR(20) DEFAULT 'borderless' COMMENT 'Finestra: fullscreen, borderless, windowed',
     window_width INT DEFAULT 0 COMMENT 'Larghezza finestra personalizzata in pixel (0=auto)',
     window_height INT DEFAULT 0 COMMENT 'Altezza finestra personalizzata in pixel (0=auto)',
+    window_margin_top INT DEFAULT 0 COMMENT 'Margine superiore in pixel (per banner/overlay)',
 
     -- Personalizzazione Numero
     number_font_family VARCHAR(100) DEFAULT 'Arial Black' COMMENT 'Font del numero',
@@ -73,6 +76,20 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     -- Slideshow
     media_folder_mode TINYINT(1) DEFAULT 0 COMMENT 'Modalità cartella (slideshow)',
     slideshow_interval_ms INT DEFAULT 5000 COMMENT 'Intervallo slideshow in ms',
+
+    -- Finestra Operatore
+    operator_window_enabled TINYINT(1) DEFAULT 0 COMMENT 'Abilita finestra operatore',
+    operator_window_x INT DEFAULT 50 COMMENT 'Posizione X finestra operatore',
+    operator_window_y INT DEFAULT 50 COMMENT 'Posizione Y finestra operatore',
+    operator_window_width INT DEFAULT 200 COMMENT 'Larghezza finestra operatore',
+    operator_window_height INT DEFAULT 80 COMMENT 'Altezza finestra operatore',
+    operator_monitor_index INT DEFAULT 0 COMMENT 'Indice monitor per finestra operatore',
+    operator_bg_color VARCHAR(20) DEFAULT '#000000' COMMENT 'Colore sfondo finestra operatore',
+    operator_text_color VARCHAR(20) DEFAULT '#FFFFFF' COMMENT 'Colore testo finestra operatore',
+    operator_font_family VARCHAR(100) DEFAULT 'Arial Black' COMMENT 'Font finestra operatore',
+    operator_font_size INT DEFAULT 36 COMMENT 'Dimensione font finestra operatore',
+    operator_always_on_top TINYINT(1) DEFAULT 1 COMMENT 'Finestra operatore sempre in primo piano',
+    operator_label_text VARCHAR(50) DEFAULT 'TURNO' COMMENT 'Testo etichetta finestra operatore',
 
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -244,7 +261,125 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN window_height INT DEFAULT 0;
     END IF;
 
-    SELECT 'Schema aggiornato con successo' AS status;
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'window_margin_top'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN window_margin_top INT DEFAULT 0;
+    END IF;
+
+    -- Colonne per finestra operatore
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_window_enabled'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_window_enabled TINYINT(1) DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_window_x'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_window_x INT DEFAULT 50;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_window_y'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_window_y INT DEFAULT 50;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_window_width'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_window_width INT DEFAULT 200;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_window_height'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_window_height INT DEFAULT 80;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_bg_color'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_bg_color VARCHAR(20) DEFAULT '#000000';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_text_color'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_text_color VARCHAR(20) DEFAULT '#FFFFFF';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_font_family'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_font_family VARCHAR(100) DEFAULT 'Arial Black';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_font_size'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_font_size INT DEFAULT 36;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_monitor_index'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_monitor_index INT DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_always_on_top'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_always_on_top TINYINT(1) DEFAULT 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'operator_label_text'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN operator_label_text VARCHAR(50) DEFAULT 'TURNO';
+    END IF;
+
+    SELECT 'Schema aggiornato con successo - inclusa finestra operatore' AS status;
 END//
 
 DELIMITER ;
@@ -368,8 +503,12 @@ SELECT * FROM v_queue_current;
 -- INSTALLAZIONE COMPLETATA!
 -- ============================================
 -- Il database è pronto per l'uso con DB-Next
+-- Include supporto per finestra operatore
 --
 -- Per pulizia log vecchi (opzionale):
 -- DELETE FROM queue_events WHERE ts < DATE_SUB(NOW(), INTERVAL 30 DAY);
+--
+-- Per abilitare finestra operatore:
+-- UPDATE queue_settings SET operator_window_enabled = 1 WHERE id = 1;
 --
 -- ============================================

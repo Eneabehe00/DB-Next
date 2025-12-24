@@ -59,6 +59,45 @@ public static class Config
         }
     }
     
+    /// <summary>
+    /// Imposta temporaneamente i parametri di connessione (per test)
+    /// </summary>
+    public static void SetConnectionParameters(string server, int port, string database, string user, string password)
+    {
+        Server = server;
+        Port = port;
+        Database = database;
+        User = user;
+        Password = password;
+    }
+
+    /// <summary>
+    /// Salva configurazione su file config.ini
+    /// </summary>
+    public static bool SaveToFile(string basePath)
+    {
+        try
+        {
+            var configPath = Path.Combine(basePath, "config.ini");
+            var content = $@"# DB-Next Configuration
+# Configurazione connessione MySQL
+
+server={Server}
+port={Port}
+database={Database}
+user={User}
+password={Password}
+";
+            File.WriteAllText(configPath, content);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore salvataggio config.ini: {ex.Message}");
+            return false;
+        }
+    }
+
     private static void CreateDefault(string path)
     {
         var content = @"# DB-Next Configuration
