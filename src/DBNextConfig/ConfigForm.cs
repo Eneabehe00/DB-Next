@@ -13,6 +13,16 @@ public class ConfigForm : Form
     private ComboBox _cmbMediaFit = null!;
     private CheckBox _chkFolderMode = null!;
     private NumericUpDown _numSlideshowInterval = null!;
+
+    // Scheduler Media
+    private CheckBox _chkSchedulerEnabled = null!;
+    private DateTimePicker _dtpSchedulerStart = null!;
+    private DateTimePicker _dtpSchedulerEnd = null!;
+    private TextBox _txtSchedulerPath = null!;
+    private ComboBox _cmbSchedulerType = null!;
+    private ComboBox _cmbSchedulerFit = null!;
+    private CheckBox _chkSchedulerFolderMode = null!;
+    private NumericUpDown _numSchedulerInterval = null!;
     
     // Layout
     private NumericUpDown _numLeftPct = null!;
@@ -106,18 +116,22 @@ public class ConfigForm : Form
             Padding = new Padding(10)
         };
 
-        var mediaLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 5, AutoSize = true };
+        var mediaLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, AutoSize = true };
+
+        // === Sezione Impostazioni Media ===
+        var grpMediaSettings = CreateGroupBox("Impostazioni Media");
+        var mediaSettingsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 5, AutoSize = true };
 
         // Riga 0: Modalità
         _chkFolderMode = new CheckBox { Text = "Modalità Cartella (slideshow)", AutoSize = true, ForeColor = Color.White };
         _chkFolderMode.CheckedChanged += (s, e) => UpdateMediaControls();
-        mediaLayout.SetColumnSpan(_chkFolderMode, 3);
-        mediaLayout.Controls.Add(_chkFolderMode, 0, 0);
+        mediaSettingsLayout.SetColumnSpan(_chkFolderMode, 3);
+        mediaSettingsLayout.Controls.Add(_chkFolderMode, 0, 0);
 
         // Riga 1: Percorso
-        mediaLayout.Controls.Add(new Label { Text = "Percorso:", AutoSize = true }, 0, 1);
+        mediaSettingsLayout.Controls.Add(new Label { Text = "Percorso:", AutoSize = true }, 0, 1);
         _txtMediaPath = new TextBox { Width = 350 };
-        mediaLayout.Controls.Add(_txtMediaPath, 1, 1);
+        mediaSettingsLayout.Controls.Add(_txtMediaPath, 1, 1);
 
         var btnBrowsePanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         var btnBrowseFile = new Button { Text = "📄", Width = 35, Height = 25 };
@@ -126,24 +140,79 @@ public class ConfigForm : Form
         btnBrowseFolder.Click += BtnBrowseFolder_Click;
         btnBrowsePanel.Controls.Add(btnBrowseFile);
         btnBrowsePanel.Controls.Add(btnBrowseFolder);
-        mediaLayout.Controls.Add(btnBrowsePanel, 2, 1);
+        mediaSettingsLayout.Controls.Add(btnBrowsePanel, 2, 1);
 
         // Riga 2: Tipo e Adattamento
-        mediaLayout.Controls.Add(new Label { Text = "Tipo:", AutoSize = true }, 0, 2);
+        mediaSettingsLayout.Controls.Add(new Label { Text = "Tipo:", AutoSize = true }, 0, 2);
         _cmbMediaType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100 };
         _cmbMediaType.Items.AddRange(new[] { "image", "gif", "video" });
-        mediaLayout.Controls.Add(_cmbMediaType, 1, 2);
+        mediaSettingsLayout.Controls.Add(_cmbMediaType, 1, 2);
 
         // Riga 3: Adattamento
-        mediaLayout.Controls.Add(new Label { Text = "Adattamento:", AutoSize = true }, 0, 3);
+        mediaSettingsLayout.Controls.Add(new Label { Text = "Adattamento:", AutoSize = true }, 0, 3);
         _cmbMediaFit = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100 };
         _cmbMediaFit.Items.AddRange(new[] { "cover", "contain" });
-        mediaLayout.Controls.Add(_cmbMediaFit, 1, 3);
+        mediaSettingsLayout.Controls.Add(_cmbMediaFit, 1, 3);
 
         // Riga 4: Intervallo slideshow
-        mediaLayout.Controls.Add(new Label { Text = "Intervallo slide (sec):", AutoSize = true }, 0, 4);
+        mediaSettingsLayout.Controls.Add(new Label { Text = "Intervallo slide (sec):", AutoSize = true }, 0, 4);
         _numSlideshowInterval = new NumericUpDown { Minimum = 1, Maximum = 60, Value = 5, Width = 70 };
-        mediaLayout.Controls.Add(_numSlideshowInterval, 1, 4);
+        mediaSettingsLayout.Controls.Add(_numSlideshowInterval, 1, 4);
+
+        grpMediaSettings.Controls.Add(mediaSettingsLayout);
+        mediaLayout.Controls.Add(grpMediaSettings);
+
+        // === Sezione Scheduler Media ===
+        var grpMediaScheduler = CreateGroupBox("Scheduler Media");
+        var schedulerLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 7, AutoSize = true };
+
+        // Riga 0: Abilitato
+        _chkSchedulerEnabled = new CheckBox { Text = "Abilita scheduler", AutoSize = true, ForeColor = Color.White };
+        _chkSchedulerEnabled.CheckedChanged += (s, e) => UpdateSchedulerControls();
+        schedulerLayout.SetColumnSpan(_chkSchedulerEnabled, 3);
+        schedulerLayout.Controls.Add(_chkSchedulerEnabled, 0, 0);
+
+        // Riga 1: Date inizio-fine
+        schedulerLayout.Controls.Add(new Label { Text = "Da:", AutoSize = true }, 0, 1);
+        _dtpSchedulerStart = new DateTimePicker { Format = DateTimePickerFormat.Short, Width = 120 };
+        schedulerLayout.Controls.Add(_dtpSchedulerStart, 1, 1);
+
+        schedulerLayout.Controls.Add(new Label { Text = "A:", AutoSize = true }, 0, 2);
+        _dtpSchedulerEnd = new DateTimePicker { Format = DateTimePickerFormat.Short, Width = 120 };
+        schedulerLayout.Controls.Add(_dtpSchedulerEnd, 1, 2);
+
+        // Riga 3: Percorso scheduler
+        schedulerLayout.Controls.Add(new Label { Text = "Cartella media:", AutoSize = true }, 0, 3);
+        _txtSchedulerPath = new TextBox { Width = 400 };
+        schedulerLayout.Controls.Add(_txtSchedulerPath, 1, 3);
+
+        var btnBrowseScheduler = new Button { Text = "📁", Width = 35, Height = 25 };
+        btnBrowseScheduler.Click += BtnBrowseSchedulerFolder_Click;
+        schedulerLayout.Controls.Add(btnBrowseScheduler, 2, 3);
+
+        // Riga 4: Tipo scheduler
+        schedulerLayout.Controls.Add(new Label { Text = "Tipo:", AutoSize = true }, 0, 4);
+        _cmbSchedulerType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100 };
+        _cmbSchedulerType.Items.AddRange(new[] { "image", "gif", "video" });
+        schedulerLayout.Controls.Add(_cmbSchedulerType, 1, 4);
+
+        // Riga 5: Adattamento scheduler
+        schedulerLayout.Controls.Add(new Label { Text = "Adattamento:", AutoSize = true }, 0, 5);
+        _cmbSchedulerFit = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 100 };
+        _cmbSchedulerFit.Items.AddRange(new[] { "cover", "contain" });
+        schedulerLayout.Controls.Add(_cmbSchedulerFit, 1, 5);
+
+        // Riga 6: Modalità cartella e intervallo scheduler
+        _chkSchedulerFolderMode = new CheckBox { Text = "Modalità cartella", AutoSize = true, ForeColor = Color.White };
+        _chkSchedulerFolderMode.CheckedChanged += (s, e) => UpdateSchedulerControls();
+        schedulerLayout.Controls.Add(_chkSchedulerFolderMode, 0, 6);
+
+        schedulerLayout.Controls.Add(new Label { Text = "Intervallo (sec):", AutoSize = true }, 1, 6);
+        _numSchedulerInterval = new NumericUpDown { Minimum = 1, Maximum = 60, Value = 5, Width = 70 };
+        schedulerLayout.Controls.Add(_numSchedulerInterval, 2, 6);
+
+        grpMediaScheduler.Controls.Add(schedulerLayout);
+        mediaLayout.Controls.Add(grpMediaScheduler);
 
         tabMedia.Controls.Add(mediaLayout);
         tabControl.TabPages.Add(tabMedia);
@@ -640,6 +709,18 @@ public class ConfigForm : Form
     {
         _numSlideshowInterval.Enabled = _chkFolderMode.Checked;
     }
+
+    private void UpdateSchedulerControls()
+    {
+        var enabled = _chkSchedulerEnabled.Checked;
+        _dtpSchedulerStart.Enabled = enabled;
+        _dtpSchedulerEnd.Enabled = enabled;
+        _txtSchedulerPath.Enabled = enabled;
+        _cmbSchedulerType.Enabled = enabled;
+        _cmbSchedulerFit.Enabled = enabled;
+        _chkSchedulerFolderMode.Enabled = enabled;
+        _numSchedulerInterval.Enabled = enabled && _chkSchedulerFolderMode.Checked;
+    }
     
     private void PickColor(Panel panel)
     {
@@ -675,6 +756,16 @@ public class ConfigForm : Form
             _cmbMediaFit.SelectedItem = _settings.MediaFit;
             _chkFolderMode.Checked = _settings.MediaFolderMode;
             _numSlideshowInterval.Value = Math.Max(1, _settings.SlideshowIntervalMs / 1000);
+
+            // Scheduler Media
+            _chkSchedulerEnabled.Checked = _settings.MediaSchedulerEnabled;
+            _dtpSchedulerStart.Value = _settings.MediaSchedulerStartDate;
+            _dtpSchedulerEnd.Value = _settings.MediaSchedulerEndDate;
+            _txtSchedulerPath.Text = _settings.MediaSchedulerPath;
+            _cmbSchedulerType.SelectedItem = _settings.MediaSchedulerType;
+            _cmbSchedulerFit.SelectedItem = _settings.MediaSchedulerFit;
+            _chkSchedulerFolderMode.Checked = _settings.MediaSchedulerFolderMode;
+            _numSchedulerInterval.Value = Math.Max(1, _settings.MediaSchedulerIntervalMs / 1000);
             
             // Layout
             _numLeftPct.Value = _settings.LayoutLeftPct;
@@ -726,6 +817,7 @@ public class ConfigForm : Form
             
             UpdateDisplayControls();
             UpdateMediaControls();
+            UpdateSchedulerControls();
             SetStatus("Impostazioni caricate", Color.LightGreen);
         }
         catch (Exception ex)
@@ -773,12 +865,25 @@ public class ConfigForm : Form
         {
             Description = "Seleziona cartella con immagini/video per slideshow"
         };
-        
+
         if (dlg.ShowDialog() == DialogResult.OK)
         {
             _txtMediaPath.Text = dlg.SelectedPath;
             _chkFolderMode.Checked = true;
             _cmbMediaType.SelectedItem = "image"; // Default per slideshow
+        }
+    }
+
+    private void BtnBrowseSchedulerFolder_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new FolderBrowserDialog
+        {
+            Description = "Seleziona cartella per scheduler media"
+        };
+
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            _txtSchedulerPath.Text = dlg.SelectedPath;
         }
     }
     
@@ -841,6 +946,16 @@ public class ConfigForm : Form
             _settings.MediaFit = _cmbMediaFit.SelectedItem?.ToString() ?? "cover";
             _settings.MediaFolderMode = _chkFolderMode.Checked;
             _settings.SlideshowIntervalMs = (int)_numSlideshowInterval.Value * 1000;
+
+            // Scheduler Media
+            _settings.MediaSchedulerEnabled = _chkSchedulerEnabled.Checked;
+            _settings.MediaSchedulerStartDate = _dtpSchedulerStart.Value.Date;
+            _settings.MediaSchedulerEndDate = _dtpSchedulerEnd.Value.Date;
+            _settings.MediaSchedulerPath = _txtSchedulerPath.Text;
+            _settings.MediaSchedulerType = _cmbSchedulerType.SelectedItem?.ToString() ?? "image";
+            _settings.MediaSchedulerFit = _cmbSchedulerFit.SelectedItem?.ToString() ?? "cover";
+            _settings.MediaSchedulerFolderMode = _chkSchedulerFolderMode.Checked;
+            _settings.MediaSchedulerIntervalMs = (int)_numSchedulerInterval.Value * 1000;
             
             // Layout
             _settings.LayoutLeftPct = (int)_numLeftPct.Value;
