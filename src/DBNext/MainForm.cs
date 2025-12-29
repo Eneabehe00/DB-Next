@@ -1,4 +1,6 @@
 using System.Drawing.Drawing2D;
+using System.Net.Http;
+using System.Text.Json;
 using DBNext.Shared;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
@@ -24,6 +26,7 @@ public class MainForm : Form
     private int _lastNumber = -1;
     private DateTime _lastSettingsCheck = DateTime.MinValue;
     private bool _isClosing = false;
+    private int _screenIndex = -1; // Indice del monitor (-1 se non specificato)
 
     // Finestra operatore
     private OperatorDisplayForm? _operatorForm;
@@ -36,10 +39,27 @@ public class MainForm : Form
     private string[] _slideshowFiles = Array.Empty<string>();
     private int _currentSlideIndex = 0;
     private bool _isPlayingVideoInSlideshow = false;
+
+    // Barra Informativa
+    private Panel _infoBarPanel;
+    private Label _timeLabel;
+    private Label _weatherLabel;
+    private Label _newsLabel;
+    private System.Windows.Forms.Timer _timeTimer;
+    private System.Windows.Forms.Timer _newsTimer;
+    private System.Windows.Forms.Timer _weatherTimer;
+    private System.Windows.Forms.Timer _newsScrollTimer;
+    private System.Windows.Forms.Timer _newsChangeTimer;
+    private List<string> _newsHeadlines = new List<string>();
+    private int _currentNewsIndex = 0;
+    private string _currentWeather = "";
+    private HttpClient _httpClient;
     
-    public MainForm(Screen targetScreen)
+    public MainForm(Screen targetScreen, QueueSettings? settings = null, int screenIndex = -1)
     {
         _targetScreen = targetScreen;
+        _settings = settings ?? new QueueSettings();
+        _screenIndex = screenIndex;
         
         // Setup form - Fullscreen senza bordi
         this.Text = "DB-Next";
@@ -120,7 +140,79 @@ public class MainForm : Form
         // Timer per slideshow
         _slideshowTimer = new System.Windows.Forms.Timer { Interval = 5000 };
         _slideshowTimer.Tick += (s, e) => NextSlide();
-        
+
+        // Barra Informativa
+        _infoBarPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            BackColor = Color.FromArgb(26, 26, 46),
+            Height = 40,
+            Visible = false
+        };
+
+        _timeLabel = new Label
+        {
+            Text = DateTime.Now.ToString("HH:mm:ss"),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 12, FontStyle.Regular),
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Location = new Point(10, 0),
+            Size = new Size(120, 40)
+        };
+
+        _weatherLabel = new Label
+        {
+            Text = "Caricamento meteo...",
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 12, FontStyle.Regular),
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Location = new Point(140, 0),
+            Size = new Size(150, 40)
+        };
+
+        _newsLabel = new Label
+        {
+            Text = "Caricamento notizie...",
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 12, FontStyle.Regular),
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Location = new Point(300, 0),
+            Size = new Size(this.Width - 300, 40)
+        };
+
+        _infoBarPanel.Controls.Add(_timeLabel);
+        _infoBarPanel.Controls.Add(_weatherLabel);
+        _infoBarPanel.Controls.Add(_newsLabel);
+
+        // Timer per aggiornamenti barra informativa
+        _timeTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        _timeTimer.Tick += (s, e) => UpdateTime();
+
+        _newsTimer = new System.Windows.Forms.Timer { Interval = 300000 }; // 5 minuti
+        _newsTimer.Tick += async (s, e) => await UpdateNewsAsync();
+
+        _weatherTimer = new System.Windows.Forms.Timer { Interval = 600000 }; // 10 minuti
+        _weatherTimer.Tick += async (s, e) => await UpdateWeatherAsync();
+
+        _newsScrollTimer = new System.Windows.Forms.Timer { Interval = 100 }; // Scrolling veloce (disabilitato)
+        _newsScrollTimer.Tick += (s, e) => ScrollNews();
+
+        _newsChangeTimer = new System.Windows.Forms.Timer { Interval = 8000 }; // Cambia notizia ogni 8 secondi
+        _newsChangeTimer.Tick += (s, e) => ChangeNews();
+
+        // HttpClient per API
+        _httpClient = new HttpClient();
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DB-Next/1.0");
+
+        // Aggiungi la barra informativa al form (in cima)
+        this.Controls.Add(_infoBarPanel);
+
         // Eventi
         this.Load += MainForm_Load;
         this.KeyDown += MainForm_KeyDown;
@@ -240,9 +332,17 @@ public class MainForm : Form
     {
         try
         {
-            Logger.Info("LoadSettingsAsync: Chiamata Database.GetSettingsAsync...");
-            _settings = await Database.GetSettingsAsync();
-            Logger.Info("LoadSettingsAsync: Database.GetSettingsAsync completato");
+            // Se le impostazioni non sono state passate dal costruttore, caricale dal database
+            if (_settings.Id == 1 && _settings.UpdatedAt == DateTime.MinValue)
+            {
+                Logger.Info("LoadSettingsAsync: Chiamata Database.GetSettingsAsync...");
+                _settings = await Database.GetSettingsAsync();
+                Logger.Info("LoadSettingsAsync: Database.GetSettingsAsync completato");
+            }
+            else
+            {
+                Logger.Info("LoadSettingsAsync: Impostazioni già caricate dal costruttore");
+            }
             
             if (_settings.LayoutLeftPct <= 0 && _settings.LayoutRightPct <= 0)
             {
@@ -255,8 +355,11 @@ public class MainForm : Form
             
             _pollTimer.Interval = Math.Max(100, _settings.PollMs > 0 ? _settings.PollMs : 1000);
             _slideshowTimer.Interval = Math.Max(1000, _settings.SlideshowIntervalMs);
-            
+
             Logger.Info($"Settings caricati: Layout {_settings.LayoutLeftPct}/{_settings.LayoutRightPct}, Window: {_settings.WindowMode}, MarginTop: {_settings.WindowMarginTop}");
+
+            // Aggiorna barra informativa
+            UpdateInfoBar();
         }
         catch (Exception ex)
         {
@@ -301,6 +404,23 @@ public class MainForm : Form
         }
     }
 
+    private int GetMirrorMarginForScreen(int screenIndex, string mirrorMargins)
+    {
+        if (string.IsNullOrEmpty(mirrorMargins))
+            return 0;
+
+        var margins = mirrorMargins.Split(',');
+        if (screenIndex < margins.Length)
+        {
+            if (int.TryParse(margins[screenIndex].Trim(), out int margin))
+            {
+                return Math.Max(0, margin); // Assicurati che non sia negativo
+            }
+        }
+
+        return 0; // Default se non specificato
+    }
+
     private void ApplyWindowBounds()
     {
         Logger.Info("ApplyWindowBounds: Inizio");
@@ -312,15 +432,26 @@ public class MainForm : Form
 
             // Applica margine superiore se configurato (per banner/overlay)
             var bounds = _targetScreen.Bounds;
-            if (_settings.WindowMarginTop > 0)
+
+            // Determina il margine da applicare
+            int marginTop = _settings.WindowMarginTop;
+
+            // In modalità mirror, usa margini specifici per monitor se configurati
+            if (_settings.ScreenMode == "mirror" && _screenIndex >= 0 && !string.IsNullOrEmpty(_settings.MirrorMarginTops))
+            {
+                marginTop = GetMirrorMarginForScreen(_screenIndex, _settings.MirrorMarginTops);
+                Logger.Info($"Modalità mirror - Monitor {_screenIndex}: margine specifico = {marginTop}px");
+            }
+
+            if (marginTop > 0)
             {
                 bounds = new Rectangle(
                     bounds.X,
-                    bounds.Y + _settings.WindowMarginTop,
+                    bounds.Y + marginTop,
                     bounds.Width,
-                    bounds.Height - _settings.WindowMarginTop
+                    bounds.Height - marginTop
                 );
-                Logger.Info($"Applicato margine superiore di {_settings.WindowMarginTop}px");
+                Logger.Info($"Applicato margine superiore di {marginTop}px");
             }
 
             this.Bounds = bounds;
@@ -428,11 +559,35 @@ public class MainForm : Form
         try
         {
             Logger.Info("UpdateLayout: Inizio");
+
+            // Calcola altezza disponibile (considerando la barra informativa se attiva)
+            var availableHeight = this.ClientSize.Height;
+            if (_settings.InfoBarEnabled)
+            {
+                availableHeight -= _settings.InfoBarHeight;
+            }
+
+            // Imposta altezza dei pannelli
+            _mediaPanel.Height = availableHeight;
+            _numberPanel.Height = availableHeight;
+
+            // Se c'è la barra informativa, riposiziona i pannelli sotto di essa
+            if (_settings.InfoBarEnabled)
+            {
+                _mediaPanel.Top = _settings.InfoBarHeight;
+                _numberPanel.Top = _settings.InfoBarHeight;
+            }
+            else
+            {
+                _mediaPanel.Top = 0;
+                _numberPanel.Top = 0;
+            }
+
             int leftPct = _settings.LayoutLeftPct > 0 ? _settings.LayoutLeftPct : 75;
             leftPct = Math.Clamp(leftPct, 0, 100);
 
             int leftWidth = (int)(this.ClientSize.Width * leftPct / 100.0);
-            Logger.Info($"UpdateLayout: Layout {leftPct}/{(100-leftPct)}, LeftWidth={leftWidth}");
+            Logger.Info($"UpdateLayout: Layout {leftPct}/{(100-leftPct)}, LeftWidth={leftWidth}, InfoBar: {_settings.InfoBarEnabled}");
 
             _mediaPanel.Width = leftWidth;
             _mediaPanel.Visible = leftPct > 0;
@@ -966,12 +1121,361 @@ public class MainForm : Form
         }
     }
 
+    // === METODI BARRA INFORMATIVA ===
+
+    private void UpdateInfoBar()
+    {
+        try
+        {
+            // Controlla se la barra deve essere abilitata per questo monitor
+            bool shouldShowInfoBar = _settings.InfoBarEnabled;
+
+            // In modalità mirror, controlla se questo monitor specifico deve mostrare la barra
+            if (_settings.ScreenMode == "mirror" && !string.IsNullOrEmpty(_settings.MirrorInfoBarDisplays))
+            {
+                var allowedDisplays = _settings.MirrorInfoBarDisplays.Split(',')
+                    .Select(s => int.TryParse(s.Trim(), out var n) ? n : -1)
+                    .Where(n => n >= 0)
+                    .ToArray();
+
+                // Se la lista non è vuota, mostra la barra solo sui monitor specificati
+                if (allowedDisplays.Length > 0)
+                {
+                    shouldShowInfoBar = allowedDisplays.Contains(_screenIndex);
+                }
+            }
+
+            if (shouldShowInfoBar)
+            {
+                _infoBarPanel.BackColor = ColorFromHex(_settings.InfoBarBgColor);
+                _infoBarPanel.Height = _settings.InfoBarHeight;
+                _infoBarPanel.Visible = true;
+
+                // Aggiorna font e colori
+                var font = new Font(_settings.InfoBarFontFamily, _settings.InfoBarFontSize, FontStyle.Regular);
+                var textColor = ColorFromHex(_settings.InfoBarTextColor);
+
+                _timeLabel.Font = font;
+                _timeLabel.ForeColor = textColor;
+                _timeLabel.BackColor = Color.Transparent;
+                _timeLabel.Height = _settings.InfoBarHeight;
+                _timeLabel.TextAlign = ContentAlignment.MiddleCenter;
+
+                _weatherLabel.Font = font;
+                _weatherLabel.ForeColor = textColor;
+                _weatherLabel.BackColor = Color.Transparent;
+                _weatherLabel.Height = _settings.InfoBarHeight;
+                _weatherLabel.TextAlign = ContentAlignment.MiddleLeft;
+
+                _newsLabel.Font = font;
+                _newsLabel.ForeColor = textColor;
+                _newsLabel.BackColor = Color.Transparent;
+                _newsLabel.Height = _settings.InfoBarHeight;
+                _newsLabel.TextAlign = ContentAlignment.MiddleLeft;
+
+                // Riposiziona controlli - ancora più spazio al meteo, tutto il resto alle notizie
+                _timeLabel.Width = 120;
+                _weatherLabel.Location = new Point(130, 0);
+                _weatherLabel.Width = 350; // Aumentato ulteriormente a 350px per molto più spazio al meteo
+                _newsLabel.Location = new Point(490, 0); // Aggiornato per riflettere il nuovo spazio del meteo
+                _newsLabel.Width = Math.Max(200, this.Width - 490); // Assicurati che abbia almeno 200px
+
+                // Avvia timer se necessario
+                StartInfoBar();
+            }
+            else
+            {
+                _infoBarPanel.Visible = false;
+                StopInfoBar();
+            }
+
+            // Aggiorna layout dei pannelli sottostanti
+            UpdateLayout();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore aggiornamento barra informativa: {ex.Message}");
+        }
+    }
+
+    private void StartInfoBar()
+    {
+        try
+        {
+            _timeTimer.Start();
+
+            if (!string.IsNullOrEmpty(_settings.NewsApiKey))
+            {
+                _newsTimer.Interval = _settings.NewsUpdateIntervalMs;
+                _newsTimer.Start();
+                _newsChangeTimer.Start(); // Nuovo timer per cambio notizia invece di scrolling
+                // Scarica notizie iniziali
+                _ = UpdateNewsAsync();
+            }
+            else
+            {
+                _newsLabel.Text = "API News non configurata";
+            }
+
+            if (!string.IsNullOrEmpty(_settings.WeatherApiKey))
+            {
+                _weatherTimer.Interval = _settings.WeatherUpdateIntervalMs;
+                _weatherTimer.Start();
+                // Scarica meteo iniziale
+                _ = UpdateWeatherAsync();
+            }
+            else
+            {
+                _weatherLabel.Text = "API Meteo non configurata";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore avvio barra informativa: {ex.Message}");
+        }
+    }
+
+    private void StopInfoBar()
+    {
+        try
+        {
+            _timeTimer.Stop();
+            _newsTimer.Stop();
+            _weatherTimer.Stop();
+            _newsScrollTimer.Stop();
+            _newsChangeTimer.Stop();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore arresto barra informativa: {ex.Message}");
+        }
+    }
+
+    private void UpdateTime()
+    {
+        try
+        {
+            if (_timeLabel.IsHandleCreated)
+            {
+                _timeLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore aggiornamento orario: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateNewsAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_settings.NewsApiKey))
+                return;
+
+            var url = $"https://newsapi.org/v2/top-headlines?country={_settings.NewsCountry}&apiKey={_settings.NewsApiKey}";
+            Logger.Info($"Richiesta NewsAPI: {url}");
+
+            var response = await _httpClient.GetAsync(url);
+            Logger.Info($"NewsAPI response status: {response.StatusCode}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.Error($"NewsAPI error: {response.StatusCode} - {errorContent}");
+                _newsHeadlines.Clear();
+                _newsHeadlines.Add($"Errore API: {response.StatusCode}");
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            Logger.Info($"NewsAPI response JSON length: {json.Length}");
+
+            var doc = JsonDocument.Parse(json);
+
+            // Controlla se c'è un errore nella risposta
+            if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() != "ok")
+            {
+                var errorMessage = doc.RootElement.TryGetProperty("message", out var message)
+                    ? message.GetString()
+                    : "Errore sconosciuto";
+                Logger.Error($"NewsAPI error message: {errorMessage}");
+                _newsHeadlines.Clear();
+                _newsHeadlines.Add($"Errore: {errorMessage}");
+                return;
+            }
+
+            _newsHeadlines.Clear();
+
+            if (doc.RootElement.TryGetProperty("articles", out var articles))
+            {
+                foreach (var article in articles.EnumerateArray())
+                {
+                    if (article.TryGetProperty("title", out var title) && !string.IsNullOrEmpty(title.GetString()))
+                    {
+                        _newsHeadlines.Add(title.GetString()!);
+                    }
+                }
+                Logger.Info($"NewsAPI: trovate {articles.GetArrayLength()} articoli");
+            }
+            else
+            {
+                Logger.Warn("NewsAPI: proprietà 'articles' non trovata nella risposta");
+            }
+
+            if (_newsHeadlines.Count == 0)
+            {
+                _newsHeadlines.Add("Nessuna notizia disponibile");
+                Logger.Info("NewsAPI: nessuna notizia valida trovata");
+            }
+
+            _currentNewsIndex = 0;
+
+            // Mostra immediatamente la prima notizia
+            if (_newsHeadlines.Count > 0 && _newsLabel.IsHandleCreated)
+            {
+                _newsLabel.Text = _newsHeadlines[0];
+            }
+
+            Logger.Info($"NewsAPI: {_newsHeadlines.Count} notizie caricate");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore caricamento notizie: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
+            _newsHeadlines.Clear();
+            _newsHeadlines.Add("Errore caricamento notizie");
+        }
+    }
+
+    private async Task UpdateWeatherAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_settings.WeatherApiKey))
+                return;
+
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={_settings.WeatherCity}&units={_settings.WeatherUnits}&appid={_settings.WeatherApiKey}&lang=it";
+            Logger.Info($"Richiesta OpenWeatherMap: città={_settings.WeatherCity}, unità={_settings.WeatherUnits}");
+
+            var response = await _httpClient.GetAsync(url);
+            Logger.Info($"OpenWeatherMap response status: {response.StatusCode}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.Error($"OpenWeatherMap error: {response.StatusCode} - {errorContent}");
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _weatherLabel.Text = "API Key non valida";
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    _weatherLabel.Text = "Limite richieste superato";
+                }
+                else
+                {
+                    _weatherLabel.Text = $"Errore API: {(int)response.StatusCode}";
+                }
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            Logger.Info($"OpenWeatherMap response JSON length: {json.Length}");
+
+            var doc = JsonDocument.Parse(json);
+
+            // Controlla se c'è un codice di errore nella risposta
+            if (doc.RootElement.TryGetProperty("cod", out var cod))
+            {
+                var codValue = cod.GetInt32();
+                if (codValue != 200)
+                {
+                    var message = doc.RootElement.TryGetProperty("message", out var msg)
+                        ? msg.GetString()
+                        : "Errore sconosciuto";
+                    Logger.Error($"OpenWeatherMap error code: {codValue} - {message}");
+                    _weatherLabel.Text = $"Errore: {message}";
+                    return;
+                }
+            }
+
+            // Estrai i dati del meteo
+            if (doc.RootElement.TryGetProperty("main", out var main) &&
+                main.TryGetProperty("temp", out var tempProp))
+            {
+                var temp = tempProp.GetDouble();
+
+                string description = "N/A";
+                if (doc.RootElement.TryGetProperty("weather", out var weather) &&
+                    weather.GetArrayLength() > 0)
+                {
+                    var weatherItem = weather[0];
+                    if (weatherItem.TryGetProperty("description", out var descProp))
+                    {
+                        description = descProp.GetString() ?? "N/A";
+                    }
+                }
+
+                _currentWeather = $"{temp:F1}°C - {description}";
+                _weatherLabel.Text = _currentWeather;
+
+                Logger.Info($"OpenWeatherMap: {_currentWeather}");
+            }
+            else
+            {
+                Logger.Error("OpenWeatherMap: struttura JSON non valida, mancanti proprietà 'main' o 'temp'");
+                _weatherLabel.Text = "Dati meteo non disponibili";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore caricamento meteo: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
+            _weatherLabel.Text = "Errore meteo";
+        }
+    }
+
+    private void ChangeNews()
+    {
+        try
+        {
+            if (_newsHeadlines.Count == 0)
+                return;
+
+            // Passa alla notizia successiva
+            _currentNewsIndex = (_currentNewsIndex + 1) % _newsHeadlines.Count;
+
+            if (_newsLabel.IsHandleCreated)
+            {
+                _newsLabel.Text = _newsHeadlines[_currentNewsIndex];
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore cambio notizia: {ex.Message}");
+        }
+    }
+
+
+    private void ScrollNews()
+    {
+        // Metodo disabilitato - ora le notizie cambiano invece di scorrere
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             _pollTimer?.Dispose();
             _slideshowTimer?.Dispose();
+            _timeTimer?.Dispose();
+            _newsTimer?.Dispose();
+            _weatherTimer?.Dispose();
+            _newsScrollTimer?.Dispose();
+            _newsChangeTimer?.Dispose();
+            _httpClient?.Dispose();
             _pictureBox?.Image?.Dispose();
             _numberLabel?.Font?.Dispose();
             _textLabel?.Font?.Dispose();

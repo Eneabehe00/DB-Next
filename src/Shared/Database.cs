@@ -59,6 +59,9 @@ public static class Database
                     screen_mode VARCHAR(20) DEFAULT 'single',
                     target_display_index INT DEFAULT 0,
                     multi_display_list VARCHAR(50) DEFAULT '0',
+                    mirror_exclude_displays VARCHAR(50) DEFAULT '0',
+                    mirror_info_bar_displays VARCHAR(50) DEFAULT '',
+                    mirror_margin_tops VARCHAR(100) DEFAULT '0',
                     window_mode VARCHAR(20) DEFAULT 'borderless',
                     window_width INT DEFAULT 0,
                     window_height INT DEFAULT 0,
@@ -86,6 +89,22 @@ public static class Database
                     operator_font_size INT DEFAULT 36,
                     operator_always_on_top TINYINT(1) DEFAULT 1,
                     operator_label_text VARCHAR(50) DEFAULT 'TURNO',
+
+                    -- Barra Informativa
+                    info_bar_enabled TINYINT(1) DEFAULT 0,
+                    info_bar_bg_color VARCHAR(20) DEFAULT '#1a1a2e',
+                    info_bar_height INT DEFAULT 40,
+                    info_bar_font_family VARCHAR(100) DEFAULT 'Segoe UI',
+                    info_bar_font_size INT DEFAULT 12,
+                    info_bar_text_color VARCHAR(20) DEFAULT '#ffffff',
+                    news_api_key VARCHAR(200) DEFAULT '',
+                    news_country VARCHAR(10) DEFAULT 'it',
+                    news_update_interval_ms INT DEFAULT 300000,
+                    weather_api_key VARCHAR(200) DEFAULT '',
+                    weather_city VARCHAR(100) DEFAULT 'Rome',
+                    weather_units VARCHAR(20) DEFAULT 'metric',
+                    weather_update_interval_ms INT DEFAULT 600000,
+
                     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8", conn))
             {
@@ -118,7 +137,35 @@ public static class Database
             {
                 Logger.Warn($"Migrazione colonne finestra operatore: {ex.Message}");
             }
-            
+
+            // Migrazione: aggiungi colonne per barra informativa se non esistono
+            try
+            {
+                await using (var cmd = new MySqlCommand(@"
+                ALTER TABLE queue_settings
+                ADD COLUMN IF NOT EXISTS info_bar_enabled TINYINT(1) DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS info_bar_bg_color VARCHAR(20) DEFAULT '#1a1a2e',
+                ADD COLUMN IF NOT EXISTS info_bar_height INT DEFAULT 40,
+                ADD COLUMN IF NOT EXISTS info_bar_font_family VARCHAR(100) DEFAULT 'Segoe UI',
+                ADD COLUMN IF NOT EXISTS info_bar_font_size INT DEFAULT 12,
+                ADD COLUMN IF NOT EXISTS info_bar_text_color VARCHAR(20) DEFAULT '#ffffff',
+                ADD COLUMN IF NOT EXISTS news_api_key VARCHAR(200) DEFAULT '',
+                ADD COLUMN IF NOT EXISTS news_country VARCHAR(10) DEFAULT 'it',
+                ADD COLUMN IF NOT EXISTS news_update_interval_ms INT DEFAULT 300000,
+                ADD COLUMN IF NOT EXISTS weather_api_key VARCHAR(200) DEFAULT '',
+                ADD COLUMN IF NOT EXISTS weather_city VARCHAR(100) DEFAULT 'Rome',
+                ADD COLUMN IF NOT EXISTS weather_units VARCHAR(20) DEFAULT 'metric',
+                ADD COLUMN IF NOT EXISTS weather_update_interval_ms INT DEFAULT 600000", conn))
+                {
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                Logger.Info("Migrazione colonne barra informativa completata");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Migrazione colonne barra informativa: {ex.Message}");
+            }
+
             // Crea tabella queue_events (sintassi compatibile MySQL 5.x)
             await using (var cmd = new MySqlCommand(@"
                 CREATE TABLE IF NOT EXISTS queue_events (
@@ -280,7 +327,8 @@ public static class Database
             await using var cmd = new MySqlCommand(@"
                 SELECT id, media_path, media_type, media_fit, poll_ms,
                        layout_left_pct, layout_right_pct, screen_mode,
-                       target_display_index, multi_display_list, window_mode,
+                       target_display_index, multi_display_list, mirror_exclude_displays,
+                       mirror_info_bar_displays, mirror_margin_tops, window_mode,
                        window_width, window_height, window_margin_top, number_font_family,
                        number_font_size, number_font_bold, number_color,
                        number_bg_color, number_label_text, number_label_color,
@@ -292,7 +340,11 @@ public static class Database
                        operator_always_on_top, operator_label_text,
                        media_scheduler_enabled, media_scheduler_start_date, media_scheduler_end_date,
                        media_scheduler_path, media_scheduler_type, media_scheduler_fit,
-                       media_scheduler_folder_mode, media_scheduler_interval_ms, updated_at
+                       media_scheduler_folder_mode, media_scheduler_interval_ms,
+                       info_bar_enabled, info_bar_bg_color, info_bar_height, info_bar_font_family,
+                       info_bar_font_size, info_bar_text_color, news_api_key, news_country,
+                       news_update_interval_ms, weather_api_key, weather_city, weather_units,
+                       weather_update_interval_ms, updated_at
                 FROM queue_settings WHERE id = 1", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             
@@ -310,43 +362,62 @@ public static class Database
                     ScreenMode = reader.IsDBNull(7) ? "single" : reader.GetString(7),
                     TargetDisplayIndex = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
                     MultiDisplayList = reader.IsDBNull(9) ? "0" : reader.GetString(9),
-                    WindowMode = reader.IsDBNull(10) ? "borderless" : reader.GetString(10),
-                    WindowWidth = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
-                    WindowHeight = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
-                    WindowMarginTop = reader.IsDBNull(13) ? 0 : reader.GetInt32(13),
-                    NumberFontFamily = reader.IsDBNull(14) ? "Arial Black" : reader.GetString(14),
-                    NumberFontSize = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
-                    NumberFontBold = reader.IsDBNull(16) ? true : reader.GetInt32(16) == 1,
-                    NumberColor = reader.IsDBNull(17) ? "#FFC832" : reader.GetString(17),
-                    NumberBgColor = reader.IsDBNull(18) ? "#14141E" : reader.GetString(18),
-                    NumberLabelText = reader.IsDBNull(19) ? "" : reader.GetString(19),
-                    NumberLabelColor = reader.IsDBNull(20) ? "#FFFFFF" : reader.GetString(20),
-                    NumberLabelSize = reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
-                    NumberLabelPosition = reader.IsDBNull(22) ? "top" : reader.GetString(22),
-                    NumberLabelOffset = reader.IsDBNull(23) ? 0 : reader.GetInt32(23),
-                    MediaFolderMode = reader.IsDBNull(24) ? false : reader.GetInt32(24) == 1,
-                    SlideshowIntervalMs = reader.IsDBNull(25) ? 5000 : reader.GetInt32(25),
-                    OperatorWindowEnabled = reader.IsDBNull(26) ? false : reader.GetInt32(26) == 1,
-                    OperatorWindowX = reader.IsDBNull(27) ? 50 : reader.GetInt32(27),
-                    OperatorWindowY = reader.IsDBNull(28) ? 50 : reader.GetInt32(28),
-                    OperatorWindowWidth = reader.IsDBNull(29) ? 200 : reader.GetInt32(29),
-                    OperatorWindowHeight = reader.IsDBNull(30) ? 80 : reader.GetInt32(30),
-                    OperatorMonitorIndex = reader.IsDBNull(31) ? 0 : reader.GetInt32(31),
-                    OperatorBgColor = reader.IsDBNull(32) ? "#000000" : reader.GetString(32),
-                    OperatorTextColor = reader.IsDBNull(33) ? "#FFFFFF" : reader.GetString(33),
-                    OperatorFontFamily = reader.IsDBNull(34) ? "Arial Black" : reader.GetString(34),
-                    OperatorFontSize = reader.IsDBNull(35) ? 36 : reader.GetInt32(35),
-                    OperatorAlwaysOnTop = reader.IsDBNull(36) ? true : reader.GetInt32(36) == 1,
-                    OperatorLabelText = reader.IsDBNull(37) ? "TURNO" : reader.GetString(37),
-                    MediaSchedulerEnabled = reader.IsDBNull(38) ? false : reader.GetInt32(38) == 1,
-                    MediaSchedulerStartDate = reader.IsDBNull(39) ? DateTime.Today : reader.GetDateTime(39),
-                    MediaSchedulerEndDate = reader.IsDBNull(40) ? DateTime.Today.AddDays(1) : reader.GetDateTime(40),
-                    MediaSchedulerPath = reader.IsDBNull(41) ? "" : reader.GetString(41),
-                    MediaSchedulerType = reader.IsDBNull(42) ? "image" : reader.GetString(42),
-                    MediaSchedulerFit = reader.IsDBNull(43) ? "cover" : reader.GetString(43),
-                    MediaSchedulerFolderMode = reader.IsDBNull(44) ? true : reader.GetInt32(44) == 1,
-                    MediaSchedulerIntervalMs = reader.IsDBNull(45) ? 5000 : reader.GetInt32(45),
-                    UpdatedAt = reader.IsDBNull(46) ? DateTime.Now : reader.GetDateTime(46)
+                    MirrorExcludeDisplays = reader.IsDBNull(10) ? "0" : reader.GetString(10),
+                    MirrorInfoBarDisplays = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    MirrorMarginTops = reader.IsDBNull(12) ? "0" : reader.GetString(12),
+                    WindowMode = reader.IsDBNull(13) ? "borderless" : reader.GetString(13),
+                    WindowWidth = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
+                    WindowHeight = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+                    WindowMarginTop = reader.IsDBNull(16) ? 0 : reader.GetInt32(16),
+                    NumberFontFamily = reader.IsDBNull(17) ? "Arial Black" : reader.GetString(17),
+                    NumberFontSize = reader.IsDBNull(18) ? 0 : reader.GetInt32(18),
+                    NumberFontBold = reader.IsDBNull(19) ? true : reader.GetInt32(19) == 1,
+                    NumberColor = reader.IsDBNull(20) ? "#FFC832" : reader.GetString(20),
+                    NumberBgColor = reader.IsDBNull(21) ? "#14141E" : reader.GetString(21),
+                    NumberLabelText = reader.IsDBNull(22) ? "" : reader.GetString(22),
+                    NumberLabelColor = reader.IsDBNull(23) ? "#FFFFFF" : reader.GetString(23),
+                    NumberLabelSize = reader.IsDBNull(24) ? 0 : reader.GetInt32(24),
+                    NumberLabelPosition = reader.IsDBNull(25) ? "top" : reader.GetString(25),
+                    NumberLabelOffset = reader.IsDBNull(26) ? 0 : reader.GetInt32(26),
+                    MediaFolderMode = reader.IsDBNull(27) ? false : reader.GetInt32(27) == 1,
+                    SlideshowIntervalMs = reader.IsDBNull(28) ? 5000 : reader.GetInt32(28),
+                    OperatorWindowEnabled = reader.IsDBNull(29) ? false : reader.GetInt32(29) == 1,
+                    OperatorWindowX = reader.IsDBNull(30) ? 50 : reader.GetInt32(30),
+                    OperatorWindowY = reader.IsDBNull(31) ? 50 : reader.GetInt32(31),
+                    OperatorWindowWidth = reader.IsDBNull(32) ? 200 : reader.GetInt32(32),
+                    OperatorWindowHeight = reader.IsDBNull(33) ? 80 : reader.GetInt32(33),
+                    OperatorMonitorIndex = reader.IsDBNull(34) ? 0 : reader.GetInt32(34),
+                    OperatorBgColor = reader.IsDBNull(35) ? "#000000" : reader.GetString(35),
+                    OperatorTextColor = reader.IsDBNull(36) ? "#FFFFFF" : reader.GetString(36),
+                    OperatorFontFamily = reader.IsDBNull(37) ? "Arial Black" : reader.GetString(37),
+                    OperatorFontSize = reader.IsDBNull(38) ? 36 : reader.GetInt32(38),
+                    OperatorAlwaysOnTop = reader.IsDBNull(39) ? true : reader.GetInt32(39) == 1,
+                    OperatorLabelText = reader.IsDBNull(40) ? "TURNO" : reader.GetString(40),
+                    MediaSchedulerEnabled = reader.IsDBNull(41) ? false : reader.GetInt32(41) == 1,
+                    MediaSchedulerStartDate = reader.IsDBNull(42) ? DateTime.Today : reader.GetDateTime(42),
+                    MediaSchedulerEndDate = reader.IsDBNull(43) ? DateTime.Today.AddDays(1) : reader.GetDateTime(43),
+                    MediaSchedulerPath = reader.IsDBNull(44) ? "" : reader.GetString(44),
+                    MediaSchedulerType = reader.IsDBNull(45) ? "image" : reader.GetString(45),
+                    MediaSchedulerFit = reader.IsDBNull(46) ? "cover" : reader.GetString(46),
+                    MediaSchedulerFolderMode = reader.IsDBNull(47) ? true : reader.GetInt32(47) == 1,
+                    MediaSchedulerIntervalMs = reader.IsDBNull(48) ? 5000 : reader.GetInt32(48),
+
+                    // Barra Informativa
+                    InfoBarEnabled = reader.IsDBNull(49) ? false : reader.GetInt32(49) == 1,
+                    InfoBarBgColor = reader.IsDBNull(50) ? "#1a1a2e" : reader.GetString(50),
+                    InfoBarHeight = reader.IsDBNull(51) ? 40 : reader.GetInt32(51),
+                    InfoBarFontFamily = reader.IsDBNull(52) ? "Segoe UI" : reader.GetString(52),
+                    InfoBarFontSize = reader.IsDBNull(53) ? 12 : reader.GetInt32(53),
+                    InfoBarTextColor = reader.IsDBNull(54) ? "#ffffff" : reader.GetString(54),
+                    NewsApiKey = reader.IsDBNull(55) ? "" : reader.GetString(55),
+                    NewsCountry = reader.IsDBNull(56) ? "it" : reader.GetString(56),
+                    NewsUpdateIntervalMs = reader.IsDBNull(57) ? 300000 : reader.GetInt32(57),
+                    WeatherApiKey = reader.IsDBNull(58) ? "" : reader.GetString(58),
+                    WeatherCity = reader.IsDBNull(59) ? "Rome" : reader.GetString(59),
+                    WeatherUnits = reader.IsDBNull(60) ? "metric" : reader.GetString(60),
+                    WeatherUpdateIntervalMs = reader.IsDBNull(61) ? 600000 : reader.GetInt32(61),
+
+                    UpdatedAt = reader.IsDBNull(62) ? DateTime.Now : reader.GetDateTime(62)
                 };
             }
         }
@@ -379,6 +450,9 @@ public static class Database
                     screen_mode = @screen_mode,
                     target_display_index = @target_display_index,
                     multi_display_list = @multi_display_list,
+                    mirror_exclude_displays = @mirror_exclude_displays,
+                    mirror_info_bar_displays = @mirror_info_bar_displays,
+                    mirror_margin_tops = @mirror_margin_tops,
                     window_mode = @window_mode,
                     window_width = @window_width,
                     window_height = @window_height,
@@ -414,7 +488,20 @@ public static class Database
                     media_scheduler_type = @media_scheduler_type,
                     media_scheduler_fit = @media_scheduler_fit,
                     media_scheduler_folder_mode = @media_scheduler_folder_mode,
-                    media_scheduler_interval_ms = @media_scheduler_interval_ms
+                    media_scheduler_interval_ms = @media_scheduler_interval_ms,
+                    info_bar_enabled = @info_bar_enabled,
+                    info_bar_bg_color = @info_bar_bg_color,
+                    info_bar_height = @info_bar_height,
+                    info_bar_font_family = @info_bar_font_family,
+                    info_bar_font_size = @info_bar_font_size,
+                    info_bar_text_color = @info_bar_text_color,
+                    news_api_key = @news_api_key,
+                    news_country = @news_country,
+                    news_update_interval_ms = @news_update_interval_ms,
+                    weather_api_key = @weather_api_key,
+                    weather_city = @weather_city,
+                    weather_units = @weather_units,
+                    weather_update_interval_ms = @weather_update_interval_ms
                 WHERE id = 1", conn);
             
             cmd.Parameters.AddWithValue("@media_path", settings.MediaPath ?? "");
@@ -426,6 +513,9 @@ public static class Database
             cmd.Parameters.AddWithValue("@screen_mode", settings.ScreenMode ?? "single");
             cmd.Parameters.AddWithValue("@target_display_index", settings.TargetDisplayIndex);
             cmd.Parameters.AddWithValue("@multi_display_list", settings.MultiDisplayList ?? "0");
+            cmd.Parameters.AddWithValue("@mirror_exclude_displays", settings.MirrorExcludeDisplays ?? "0");
+            cmd.Parameters.AddWithValue("@mirror_info_bar_displays", settings.MirrorInfoBarDisplays ?? "");
+            cmd.Parameters.AddWithValue("@mirror_margin_tops", settings.MirrorMarginTops ?? "0");
             cmd.Parameters.AddWithValue("@window_mode", settings.WindowMode ?? "borderless");
             cmd.Parameters.AddWithValue("@window_width", settings.WindowWidth);
             cmd.Parameters.AddWithValue("@window_height", settings.WindowHeight);
@@ -462,6 +552,21 @@ public static class Database
             cmd.Parameters.AddWithValue("@media_scheduler_fit", settings.MediaSchedulerFit ?? "cover");
             cmd.Parameters.AddWithValue("@media_scheduler_folder_mode", settings.MediaSchedulerFolderMode ? 1 : 0);
             cmd.Parameters.AddWithValue("@media_scheduler_interval_ms", settings.MediaSchedulerIntervalMs);
+
+            // Parametri barra informativa
+            cmd.Parameters.AddWithValue("@info_bar_enabled", settings.InfoBarEnabled ? 1 : 0);
+            cmd.Parameters.AddWithValue("@info_bar_bg_color", settings.InfoBarBgColor ?? "#1a1a2e");
+            cmd.Parameters.AddWithValue("@info_bar_height", settings.InfoBarHeight);
+            cmd.Parameters.AddWithValue("@info_bar_font_family", settings.InfoBarFontFamily ?? "Segoe UI");
+            cmd.Parameters.AddWithValue("@info_bar_font_size", settings.InfoBarFontSize);
+            cmd.Parameters.AddWithValue("@info_bar_text_color", settings.InfoBarTextColor ?? "#ffffff");
+            cmd.Parameters.AddWithValue("@news_api_key", settings.NewsApiKey ?? "");
+            cmd.Parameters.AddWithValue("@news_country", settings.NewsCountry ?? "it");
+            cmd.Parameters.AddWithValue("@news_update_interval_ms", settings.NewsUpdateIntervalMs);
+            cmd.Parameters.AddWithValue("@weather_api_key", settings.WeatherApiKey ?? "");
+            cmd.Parameters.AddWithValue("@weather_city", settings.WeatherCity ?? "Rome");
+            cmd.Parameters.AddWithValue("@weather_units", settings.WeatherUnits ?? "metric");
+            cmd.Parameters.AddWithValue("@weather_update_interval_ms", settings.WeatherUpdateIntervalMs);
 
             await cmd.ExecuteNonQueryAsync();
             Logger.Info("Impostazioni salvate");

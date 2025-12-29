@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     screen_mode VARCHAR(20) DEFAULT 'single' COMMENT 'Modalità: single, mirror, multi',
     target_display_index INT DEFAULT 0 COMMENT 'Indice monitor per modalità single',
     multi_display_list VARCHAR(50) DEFAULT '0' COMMENT 'Lista monitor per modalità multi (es. 0,2)',
+    mirror_exclude_displays VARCHAR(50) DEFAULT '0' COMMENT 'Monitor da escludere in modalità mirror (es. 0)',
+    mirror_info_bar_displays VARCHAR(50) DEFAULT '' COMMENT 'Monitor che mostrano la barra info in modalità mirror (es. 1,2, vuoto=tutti)',
+    mirror_margin_tops VARCHAR(100) DEFAULT '0' COMMENT 'Margini superiori per monitor in modalità mirror (es. 0,50,0,0)',
     window_mode VARCHAR(20) DEFAULT 'borderless' COMMENT 'Finestra: fullscreen, borderless, windowed',
     window_width INT DEFAULT 0 COMMENT 'Larghezza finestra personalizzata in pixel (0=auto)',
     window_height INT DEFAULT 0 COMMENT 'Altezza finestra personalizzata in pixel (0=auto)',
@@ -454,7 +457,155 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN media_scheduler_interval_ms INT DEFAULT 5000;
     END IF;
 
-    SELECT 'Schema aggiornato con successo - inclusa finestra operatore e scheduler media' AS status;
+    -- Colonne per barra informativa
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_enabled'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_enabled TINYINT(1) DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_bg_color'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_bg_color VARCHAR(20) DEFAULT '#1a1a2e';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_height'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_height INT DEFAULT 40;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_font_family'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_font_family VARCHAR(100) DEFAULT 'Segoe UI';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_font_size'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_font_size INT DEFAULT 12;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'info_bar_text_color'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN info_bar_text_color VARCHAR(20) DEFAULT '#ffffff';
+    END IF;
+
+    -- Colonne per esclusione monitor in modalità mirror
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'mirror_exclude_displays'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN mirror_exclude_displays VARCHAR(50) DEFAULT '0';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'mirror_info_bar_displays'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN mirror_info_bar_displays VARCHAR(50) DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'mirror_margin_tops'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN mirror_margin_tops VARCHAR(100) DEFAULT '0';
+    END IF;
+
+    -- Colonne per API News
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'news_api_key'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN news_api_key VARCHAR(200) DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'news_country'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN news_country VARCHAR(10) DEFAULT 'it';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'news_update_interval_ms'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN news_update_interval_ms INT DEFAULT 300000;
+    END IF;
+
+    -- Colonne per API Meteo
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'weather_api_key'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN weather_api_key VARCHAR(200) DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'weather_city'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN weather_city VARCHAR(100) DEFAULT 'Rome';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'weather_units'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN weather_units VARCHAR(20) DEFAULT 'metric';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'weather_update_interval_ms'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN weather_update_interval_ms INT DEFAULT 600000;
+    END IF;
+
+    SELECT 'Schema aggiornato con successo - inclusa finestra operatore, scheduler media e barra informativa' AS status;
 END//
 
 DELIMITER ;

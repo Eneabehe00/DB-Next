@@ -33,6 +33,9 @@ public class ConfigForm : Form
     private ComboBox _cmbScreenMode = null!;
     private ComboBox _cmbTargetDisplay = null!;
     private TextBox _txtMultiDisplayList = null!;
+    private ComboBox _cmbMirrorExcludeDisplays = null!;
+    private ComboBox _cmbMirrorInfoBarDisplays = null!;
+    private Dictionary<int, NumericUpDown> _mirrorMarginControls = new();
     private ComboBox _cmbWindowMode = null!;
     private NumericUpDown _numWindowMarginTop = null!;
     
@@ -63,7 +66,22 @@ public class ConfigForm : Form
     private NumericUpDown _numOperatorFontSize = null!;
     private CheckBox _chkOperatorAlwaysOnTop = null!;
     private TextBox _txtOperatorLabelText = null!;
-    
+
+    // Barra Informativa
+    private CheckBox _chkInfoBarEnabled = null!;
+    private Panel _pnlInfoBarBgColor = null!;
+    private NumericUpDown _numInfoBarHeight = null!;
+    private ComboBox _cmbInfoBarFont = null!;
+    private NumericUpDown _numInfoBarFontSize = null!;
+    private Panel _pnlInfoBarTextColor = null!;
+    private TextBox _txtNewsApiKey = null!;
+    private TextBox _txtNewsCountry = null!;
+    private NumericUpDown _numNewsUpdateInterval = null!;
+    private TextBox _txtWeatherApiKey = null!;
+    private TextBox _txtWeatherCity = null!;
+    private ComboBox _cmbWeatherUnits = null!;
+    private NumericUpDown _numWeatherUpdateInterval = null!;
+
     // Personalizzazione numero
     private ComboBox _cmbNumberFont = null!;
     private NumericUpDown _numNumberFontSize = null!;
@@ -92,10 +110,11 @@ public class ConfigForm : Form
     private void InitializeComponent()
     {
         this.Text = "DB-Next Configurazione";
-        this.Size = new Size(800, 700);
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
+        this.Size = new Size(850, 900);
+        this.FormBorderStyle = FormBorderStyle.Sizable;
+        this.MaximizeBox = true;
+        this.MinimizeBox = true;
+        this.MinimumSize = new Size(800, 900);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.BackColor = Color.FromArgb(30, 30, 40);
         this.ForeColor = Color.White;
@@ -216,7 +235,131 @@ public class ConfigForm : Form
 
         tabMedia.Controls.Add(mediaLayout);
         tabControl.TabPages.Add(tabMedia);
-        
+
+        // === Tab Barra Informativa ===
+        var tabInfoBar = new TabPage("📊 Info Bar")
+        {
+            BackColor = Color.FromArgb(30, 30, 40),
+            ForeColor = Color.White,
+            Padding = new Padding(10)
+        };
+
+        var infoBarLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
+
+        // === Sezione Barra Informativa ===
+        var grpInfoBar = CreateGroupBox("Barra Informativa");
+        var infoBarSettingsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 6, AutoSize = true };
+
+        // Riga 0: Abilitato
+        _chkInfoBarEnabled = new CheckBox { Text = "Abilita barra informativa", AutoSize = true, ForeColor = Color.White };
+        _chkInfoBarEnabled.CheckedChanged += (s, e) => UpdateInfoBarControls();
+        infoBarSettingsLayout.SetColumnSpan(_chkInfoBarEnabled, 4);
+        infoBarSettingsLayout.Controls.Add(_chkInfoBarEnabled, 0, 0);
+
+        // Riga 1: Sfondo e altezza
+        infoBarSettingsLayout.Controls.Add(new Label { Text = "Sfondo:", AutoSize = true }, 0, 1);
+        _pnlInfoBarBgColor = new Panel
+        {
+            Width = 60, Height = 25,
+            BackColor = Color.FromArgb(26, 26, 46),
+            BorderStyle = BorderStyle.FixedSingle,
+            Cursor = Cursors.Hand
+        };
+        _pnlInfoBarBgColor.Click += (s, e) => PickColor(_pnlInfoBarBgColor);
+        infoBarSettingsLayout.Controls.Add(_pnlInfoBarBgColor, 1, 1);
+
+        infoBarSettingsLayout.Controls.Add(new Label { Text = "Altezza:", AutoSize = true }, 2, 1);
+        _numInfoBarHeight = new NumericUpDown { Minimum = 20, Maximum = 100, Value = 40, Width = 60 };
+        infoBarSettingsLayout.Controls.Add(_numInfoBarHeight, 3, 1);
+
+        // Riga 2: Font
+        infoBarSettingsLayout.Controls.Add(new Label { Text = "Font:", AutoSize = true }, 0, 2);
+        _cmbInfoBarFont = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
+        _cmbInfoBarFont.Items.AddRange(new[] { "Segoe UI", "Arial", "Arial Black", "Calibri", "Verdana" });
+        infoBarSettingsLayout.Controls.Add(_cmbInfoBarFont, 1, 2);
+
+        infoBarSettingsLayout.Controls.Add(new Label { Text = "Dimensione:", AutoSize = true }, 2, 2);
+        _numInfoBarFontSize = new NumericUpDown { Minimum = 8, Maximum = 24, Value = 12, Width = 60 };
+        infoBarSettingsLayout.Controls.Add(_numInfoBarFontSize, 3, 2);
+
+        // Riga 3: Colore testo
+        infoBarSettingsLayout.Controls.Add(new Label { Text = "Colore testo:", AutoSize = true }, 0, 3);
+        _pnlInfoBarTextColor = new Panel
+        {
+            Width = 60, Height = 25,
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Cursor = Cursors.Hand
+        };
+        _pnlInfoBarTextColor.Click += (s, e) => PickColor(_pnlInfoBarTextColor);
+        infoBarSettingsLayout.Controls.Add(_pnlInfoBarTextColor, 1, 3);
+
+        grpInfoBar.Controls.Add(infoBarSettingsLayout);
+        infoBarLayout.Controls.Add(grpInfoBar);
+
+        // === Sezione API News ===
+        var grpNewsApi = CreateGroupBox("API Notizie (NewsAPI.org)");
+        var newsApiLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3, AutoSize = true };
+
+        // Riga 0: API Key
+        newsApiLayout.Controls.Add(new Label { Text = "API Key:", AutoSize = true }, 0, 0);
+        _txtNewsApiKey = new TextBox { Width = 200, UseSystemPasswordChar = true };
+        newsApiLayout.SetColumnSpan(_txtNewsApiKey, 3);
+        newsApiLayout.Controls.Add(_txtNewsApiKey, 1, 0);
+
+        // Riga 1: Paese e intervallo
+        newsApiLayout.Controls.Add(new Label { Text = "Paese:", AutoSize = true }, 0, 1);
+        _txtNewsCountry = new TextBox { Width = 40, Text = "it" };
+        newsApiLayout.Controls.Add(_txtNewsCountry, 1, 1);
+
+        newsApiLayout.Controls.Add(new Label { Text = "Aggiornamento (min):", AutoSize = true }, 2, 1);
+        _numNewsUpdateInterval = new NumericUpDown { Minimum = 1, Maximum = 60, Value = 5, Width = 60 };
+        newsApiLayout.Controls.Add(_numNewsUpdateInterval, 3, 1);
+
+        // Riga 2: Pulsante test
+        var btnTestNews = new Button { Text = "Test News API", Width = 120, Height = 25 };
+        btnTestNews.Click += async (s, e) => await TestNewsApiAsync();
+        newsApiLayout.Controls.Add(btnTestNews, 0, 2);
+
+        grpNewsApi.Controls.Add(newsApiLayout);
+        infoBarLayout.Controls.Add(grpNewsApi);
+
+        // === Sezione API Meteo ===
+        var grpWeatherApi = CreateGroupBox("API Meteo (OpenWeatherMap.org)");
+        var weatherApiLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3, AutoSize = true };
+
+        // Riga 0: API Key
+        weatherApiLayout.Controls.Add(new Label { Text = "API Key:", AutoSize = true }, 0, 0);
+        _txtWeatherApiKey = new TextBox { Width = 200, UseSystemPasswordChar = true };
+        weatherApiLayout.SetColumnSpan(_txtWeatherApiKey, 3);
+        weatherApiLayout.Controls.Add(_txtWeatherApiKey, 1, 0);
+
+        // Riga 1: Città e unità
+        weatherApiLayout.Controls.Add(new Label { Text = "Città:", AutoSize = true }, 0, 1);
+        _txtWeatherCity = new TextBox { Width = 100, Text = "Rome" };
+        weatherApiLayout.Controls.Add(_txtWeatherCity, 1, 1);
+
+        weatherApiLayout.Controls.Add(new Label { Text = "Unità:", AutoSize = true }, 2, 1);
+        _cmbWeatherUnits = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
+        _cmbWeatherUnits.Items.AddRange(new[] { "metric", "imperial" });
+        weatherApiLayout.Controls.Add(_cmbWeatherUnits, 3, 1);
+
+        // Riga 2: Intervallo
+        weatherApiLayout.Controls.Add(new Label { Text = "Aggiornamento (min):", AutoSize = true }, 0, 2);
+        _numWeatherUpdateInterval = new NumericUpDown { Minimum = 5, Maximum = 120, Value = 10, Width = 60 };
+        weatherApiLayout.Controls.Add(_numWeatherUpdateInterval, 1, 2);
+
+        // Riga 3: Pulsanti test
+        var btnTestWeather = new Button { Text = "Test Weather API", Width = 120, Height = 25 };
+        btnTestWeather.Click += async (s, e) => await TestWeatherApiAsync();
+        weatherApiLayout.Controls.Add(btnTestWeather, 0, 3);
+
+        grpWeatherApi.Controls.Add(weatherApiLayout);
+        infoBarLayout.Controls.Add(grpWeatherApi);
+
+        tabInfoBar.Controls.Add(infoBarLayout);
+        tabControl.TabPages.Add(tabInfoBar);
+
         // === Tab Aspetto ===
         var tabAspetto = new TabPage("🎨 Aspetto")
         {
@@ -351,33 +494,67 @@ public class ConfigForm : Form
 
         // === Sezione Display ===
         var grpDisplay = CreateGroupBox("Display");
-        var displayLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, AutoSize = true };
+        var displayFlow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            AutoSize = true,
+            WrapContents = false
+        };
 
-        displayLayout.Controls.Add(new Label { Text = "Modalità schermo:", AutoSize = true }, 0, 0);
+        // --- Configurazione Base ---
+        var grpBase = CreateGroupBox("Configurazione Base");
+        grpBase.Width = 720;
+        grpBase.Height = 150;
+        var baseLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+
+        baseLayout.Controls.Add(new Label { Text = "Modalità schermo:", AutoSize = true }, 0, 0);
         _cmbScreenMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         _cmbScreenMode.Items.AddRange(new[] { "single", "mirror", "multi" });
         _cmbScreenMode.SelectedIndexChanged += CmbScreenMode_Changed;
-        displayLayout.Controls.Add(_cmbScreenMode, 1, 0);
+        baseLayout.Controls.Add(_cmbScreenMode, 1, 0);
 
-        displayLayout.Controls.Add(new Label { Text = "Monitor target:", AutoSize = true }, 0, 1);
+        baseLayout.Controls.Add(new Label { Text = "Monitor target:", AutoSize = true }, 0, 1);
         _cmbTargetDisplay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         PopulateMonitors();
-        displayLayout.Controls.Add(_cmbTargetDisplay, 1, 1);
+        baseLayout.Controls.Add(_cmbTargetDisplay, 1, 1);
 
-        displayLayout.Controls.Add(new Label { Text = "Lista multi (es. 0,2):", AutoSize = true }, 0, 2);
+        baseLayout.Controls.Add(new Label { Text = "Lista multi (es. 0,2):", AutoSize = true }, 0, 2);
         _txtMultiDisplayList = new TextBox { Width = 200 };
-        displayLayout.Controls.Add(_txtMultiDisplayList, 1, 2);
+        baseLayout.Controls.Add(_txtMultiDisplayList, 1, 2);
 
-        displayLayout.Controls.Add(new Label { Text = "Modalità finestra:", AutoSize = true }, 0, 3);
-        _cmbWindowMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
-        _cmbWindowMode.Items.AddRange(new[] { "borderless", "fullscreen", "windowed" });
-        displayLayout.Controls.Add(_cmbWindowMode, 1, 3);
-
-        displayLayout.Controls.Add(new Label { Text = "Margine superiore (px):", AutoSize = true }, 0, 4);
+        baseLayout.Controls.Add(new Label { Text = "Margine generale (px):", AutoSize = true }, 0, 3);
         _numWindowMarginTop = new NumericUpDown { Minimum = 0, Maximum = 500, Value = 0, Width = 100 };
-        displayLayout.Controls.Add(_numWindowMarginTop, 1, 4);
+        baseLayout.Controls.Add(_numWindowMarginTop, 1, 3);
 
-        grpDisplay.Controls.Add(displayLayout);
+        grpBase.Controls.Add(baseLayout);
+        displayFlow.Controls.Add(grpBase);
+
+        // --- Configurazione Modalità Mirror ---
+        var grpMirror = CreateGroupBox("Modalità Mirror");
+        grpMirror.Width = 720;
+        int mirrorHeight = Math.Max(200, Screen.AllScreens.Length * 35 + 100);
+        grpMirror.Height = mirrorHeight;
+        var mirrorLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+
+        mirrorLayout.Controls.Add(new Label { Text = "Escludi monitor:", AutoSize = true }, 0, 0);
+        _cmbMirrorExcludeDisplays = new ComboBox { Width = 200, DropDownStyle = ComboBoxStyle.DropDown };
+        PopulateMirrorExcludeDisplays();
+        mirrorLayout.Controls.Add(_cmbMirrorExcludeDisplays, 1, 0);
+
+        mirrorLayout.Controls.Add(new Label { Text = "Barra informativa:", AutoSize = true }, 0, 1);
+        _cmbMirrorInfoBarDisplays = new ComboBox { Width = 200, DropDownStyle = ComboBoxStyle.DropDown };
+        PopulateMirrorInfoBarDisplays();
+        mirrorLayout.Controls.Add(_cmbMirrorInfoBarDisplays, 1, 1);
+
+        // Aggiungi controlli per margini individuali di ogni monitor
+        CreateMirrorMarginControlsTable(mirrorLayout, 2);
+
+        grpMirror.Controls.Add(mirrorLayout);
+        displayFlow.Controls.Add(grpMirror);
+
+
+        grpDisplay.Controls.Add(displayFlow);
         layoutTabLayout.Controls.Add(grpDisplay);
 
         tabLayout.Controls.Add(layoutTabLayout);
@@ -692,6 +869,193 @@ public class ConfigForm : Form
             _cmbTargetDisplay.SelectedIndex = 0;
     }
 
+    private void PopulateMirrorExcludeDisplays()
+    {
+        _cmbMirrorExcludeDisplays.Items.Clear();
+        _cmbMirrorExcludeDisplays.Items.Add("Nessuno");
+        for (int i = 0; i < Screen.AllScreens.Length; i++)
+        {
+            var screen = Screen.AllScreens[i];
+            var primary = screen.Primary ? " (Primario)" : "";
+            _cmbMirrorExcludeDisplays.Items.Add($"{i}: {screen.Bounds.Width}x{screen.Bounds.Height}{primary}");
+        }
+        _cmbMirrorExcludeDisplays.SelectedIndex = 0;
+    }
+
+    private void PopulateMirrorInfoBarDisplays()
+    {
+        _cmbMirrorInfoBarDisplays.Items.Clear();
+        _cmbMirrorInfoBarDisplays.Items.Add("Tutti");
+        _cmbMirrorInfoBarDisplays.Items.Add("Nessuno");
+        for (int i = 0; i < Screen.AllScreens.Length; i++)
+        {
+            var screen = Screen.AllScreens[i];
+            var primary = screen.Primary ? " (Primario)" : "";
+            _cmbMirrorInfoBarDisplays.Items.Add($"{i}: {screen.Bounds.Width}x{screen.Bounds.Height}{primary}");
+        }
+        _cmbMirrorInfoBarDisplays.Items.Add("Monitor 0,1");
+        _cmbMirrorInfoBarDisplays.Items.Add("Monitor 1,2");
+        _cmbMirrorInfoBarDisplays.Items.Add("Monitor 2,3");
+        _cmbMirrorInfoBarDisplays.SelectedIndex = 0;
+    }
+
+    private void CreateMirrorMarginControlsTable(TableLayoutPanel table, int startRow)
+    {
+        _mirrorMarginControls.Clear();
+
+        for (int i = 0; i < Screen.AllScreens.Length; i++)
+        {
+            var screen = Screen.AllScreens[i];
+            var primary = screen.Primary ? " (Primario)" : "";
+
+            var label = new Label
+            {
+                Text = $"Monitor {i}: {screen.Bounds.Width}x{screen.Bounds.Height}{primary}",
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            var numeric = new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = 500,
+                Value = 0,
+                Width = 80
+            };
+
+            _mirrorMarginControls[i] = numeric;
+
+            table.Controls.Add(label, 0, startRow + i);
+            table.Controls.Add(numeric, 1, startRow + i);
+        }
+    }
+
+    private void SetMirrorExcludeDisplaysValue(string value)
+    {
+        if (string.IsNullOrEmpty(value) || value == "0")
+        {
+            _cmbMirrorExcludeDisplays.SelectedIndex = 0; // "Nessuno"
+        }
+        else
+        {
+            // Cerca il monitor specifico
+            for (int i = 0; i < _cmbMirrorExcludeDisplays.Items.Count; i++)
+            {
+                if (_cmbMirrorExcludeDisplays.Items[i]?.ToString()?.StartsWith(value.Split(',')[0] + ":") == true)
+                {
+                    _cmbMirrorExcludeDisplays.SelectedIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    private void SetMirrorInfoBarDisplaysValue(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            _cmbMirrorInfoBarDisplays.SelectedIndex = 0; // "Tutti"
+        }
+        else if (value == "nessuno" || value == "none")
+        {
+            _cmbMirrorInfoBarDisplays.SelectedIndex = 1; // "Nessuno"
+        }
+        else
+        {
+            // Cerca corrispondenze predefinite o monitor specifici
+            for (int i = 0; i < _cmbMirrorInfoBarDisplays.Items.Count; i++)
+            {
+                var item = _cmbMirrorInfoBarDisplays.Items[i]?.ToString();
+                if (item != null)
+                {
+                    if (item.StartsWith("Monitor") && item.Contains(value.Replace(",", ",")))
+                    {
+                        _cmbMirrorInfoBarDisplays.SelectedIndex = i;
+                        return;
+                    }
+                    if (item.StartsWith(value.Split(',')[0] + ":"))
+                    {
+                        _cmbMirrorInfoBarDisplays.SelectedIndex = i;
+                        return;
+                    }
+                }
+            }
+            // Default a "Tutti" se non trova corrispondenza
+            _cmbMirrorInfoBarDisplays.SelectedIndex = 0;
+        }
+    }
+
+    private string GetMirrorExcludeDisplaysValue()
+    {
+        if (_cmbMirrorExcludeDisplays.SelectedIndex <= 0)
+            return "0"; // "Nessuno"
+
+        var selectedText = _cmbMirrorExcludeDisplays.SelectedItem?.ToString();
+        if (selectedText != null)
+        {
+            var colonIndex = selectedText.IndexOf(':');
+            if (colonIndex > 0)
+            {
+                return selectedText.Substring(0, colonIndex);
+            }
+        }
+        return "0";
+    }
+
+    private string GetMirrorInfoBarDisplaysValue()
+    {
+        if (_cmbMirrorInfoBarDisplays.SelectedIndex == 0)
+            return ""; // "Tutti"
+
+        if (_cmbMirrorInfoBarDisplays.SelectedIndex == 1)
+            return "nessuno"; // "Nessuno"
+
+        var selectedText = _cmbMirrorInfoBarDisplays.SelectedItem?.ToString();
+        if (selectedText == null)
+            return "";
+
+        // Se è una selezione predefinita come "Monitor 0,1"
+        if (selectedText.StartsWith("Monitor "))
+        {
+            return selectedText.Replace("Monitor ", "").Replace(",", ",");
+        }
+
+        // Se è un monitor specifico
+        var colonIndex = selectedText.IndexOf(':');
+        if (colonIndex > 0)
+        {
+            return selectedText.Substring(0, colonIndex);
+        }
+
+        return ""; // Default a tutti
+    }
+
+    private void LoadMirrorMarginValues(string marginValues)
+    {
+        var margins = marginValues.Split(',');
+        for (int i = 0; i < _mirrorMarginControls.Count; i++)
+        {
+            if (i < margins.Length && int.TryParse(margins[i].Trim(), out int margin))
+            {
+                _mirrorMarginControls[i].Value = Math.Min(500, Math.Max(0, margin));
+            }
+            else
+            {
+                _mirrorMarginControls[i].Value = 0;
+            }
+        }
+    }
+
+    private string GetMirrorMarginValues()
+    {
+        var values = new List<string>();
+        for (int i = 0; i < _mirrorMarginControls.Count; i++)
+        {
+            values.Add(_mirrorMarginControls[i].Value.ToString());
+        }
+        return string.Join(",", values);
+    }
+
     private void PopulateOperatorMonitors()
     {
         _cmbOperatorMonitor.Items.Clear();
@@ -720,6 +1084,23 @@ public class ConfigForm : Form
         _cmbSchedulerFit.Enabled = enabled;
         _chkSchedulerFolderMode.Enabled = enabled;
         _numSchedulerInterval.Enabled = enabled && _chkSchedulerFolderMode.Checked;
+    }
+
+    private void UpdateInfoBarControls()
+    {
+        var enabled = _chkInfoBarEnabled.Checked;
+        _pnlInfoBarBgColor.Enabled = enabled;
+        _numInfoBarHeight.Enabled = enabled;
+        _cmbInfoBarFont.Enabled = enabled;
+        _numInfoBarFontSize.Enabled = enabled;
+        _pnlInfoBarTextColor.Enabled = enabled;
+        _txtNewsApiKey.Enabled = enabled;
+        _txtNewsCountry.Enabled = enabled;
+        _numNewsUpdateInterval.Enabled = enabled;
+        _txtWeatherApiKey.Enabled = enabled;
+        _txtWeatherCity.Enabled = enabled;
+        _cmbWeatherUnits.Enabled = enabled;
+        _numWeatherUpdateInterval.Enabled = enabled;
     }
     
     private void PickColor(Panel panel)
@@ -777,7 +1158,9 @@ public class ConfigForm : Form
             if (_settings.TargetDisplayIndex < _cmbTargetDisplay.Items.Count)
                 _cmbTargetDisplay.SelectedIndex = _settings.TargetDisplayIndex;
             _txtMultiDisplayList.Text = _settings.MultiDisplayList;
-            _cmbWindowMode.SelectedItem = _settings.WindowMode;
+            SetMirrorExcludeDisplaysValue(_settings.MirrorExcludeDisplays ?? "0");
+            SetMirrorInfoBarDisplaysValue(_settings.MirrorInfoBarDisplays ?? "");
+            LoadMirrorMarginValues(_settings.MirrorMarginTops ?? "0");
             _numWindowMarginTop.Value = Math.Max(0, Math.Min(500, _settings.WindowMarginTop));
             
             // Polling
@@ -814,10 +1197,27 @@ public class ConfigForm : Form
             _numOperatorFontSize.Value = Math.Max(12, Math.Min(100, _settings.OperatorFontSize));
             _chkOperatorAlwaysOnTop.Checked = _settings.OperatorAlwaysOnTop;
             _txtOperatorLabelText.Text = _settings.OperatorLabelText ?? "TURNO";
-            
+
+            // Barra Informativa
+            _chkInfoBarEnabled.Checked = _settings.InfoBarEnabled;
+            _pnlInfoBarBgColor.BackColor = ColorFromHex(_settings.InfoBarBgColor);
+            _numInfoBarHeight.Value = Math.Max(20, Math.Min(100, _settings.InfoBarHeight));
+            _cmbInfoBarFont.SelectedItem = _settings.InfoBarFontFamily;
+            if (_cmbInfoBarFont.SelectedIndex < 0) _cmbInfoBarFont.SelectedIndex = 0;
+            _numInfoBarFontSize.Value = Math.Max(8, Math.Min(24, _settings.InfoBarFontSize));
+            _pnlInfoBarTextColor.BackColor = ColorFromHex(_settings.InfoBarTextColor);
+            _txtNewsApiKey.Text = _settings.NewsApiKey;
+            _txtNewsCountry.Text = _settings.NewsCountry ?? "it";
+            _numNewsUpdateInterval.Value = Math.Max(1, Math.Min(60, _settings.NewsUpdateIntervalMs / 60000));
+            _txtWeatherApiKey.Text = _settings.WeatherApiKey;
+            _txtWeatherCity.Text = _settings.WeatherCity ?? "Rome";
+            _cmbWeatherUnits.SelectedItem = _settings.WeatherUnits ?? "metric";
+            _numWeatherUpdateInterval.Value = Math.Max(5, Math.Min(120, _settings.WeatherUpdateIntervalMs / 60000));
+
             UpdateDisplayControls();
             UpdateMediaControls();
             UpdateSchedulerControls();
+            UpdateInfoBarControls();
             SetStatus("Impostazioni caricate", Color.LightGreen);
         }
         catch (Exception ex)
@@ -934,6 +1334,14 @@ public class ConfigForm : Form
         var mode = _cmbScreenMode.SelectedItem?.ToString() ?? "single";
         _cmbTargetDisplay.Enabled = mode == "single";
         _txtMultiDisplayList.Enabled = mode == "multi";
+        _cmbMirrorExcludeDisplays.Enabled = mode == "mirror";
+        _cmbMirrorInfoBarDisplays.Enabled = mode == "mirror";
+
+        // Abilita/disabilita tutti i controlli dei margini
+        foreach (var control in _mirrorMarginControls.Values)
+        {
+            control.Enabled = mode == "mirror";
+        }
     }
     
     private async void BtnSave_Click(object? sender, EventArgs e)
@@ -965,7 +1373,9 @@ public class ConfigForm : Form
             _settings.ScreenMode = _cmbScreenMode.SelectedItem?.ToString() ?? "single";
             _settings.TargetDisplayIndex = _cmbTargetDisplay.SelectedIndex;
             _settings.MultiDisplayList = _txtMultiDisplayList.Text;
-            _settings.WindowMode = _cmbWindowMode.SelectedItem?.ToString() ?? "borderless";
+            _settings.MirrorExcludeDisplays = GetMirrorExcludeDisplaysValue();
+            _settings.MirrorInfoBarDisplays = GetMirrorInfoBarDisplaysValue();
+            _settings.MirrorMarginTops = GetMirrorMarginValues();
             _settings.WindowMarginTop = (int)_numWindowMarginTop.Value;
             
             // Polling
@@ -998,7 +1408,22 @@ public class ConfigForm : Form
             _settings.OperatorFontSize = (int)_numOperatorFontSize.Value;
             _settings.OperatorAlwaysOnTop = _chkOperatorAlwaysOnTop.Checked;
             _settings.OperatorLabelText = _txtOperatorLabelText.Text;
-            
+
+            // Barra Informativa
+            _settings.InfoBarEnabled = _chkInfoBarEnabled.Checked;
+            _settings.InfoBarBgColor = ColorToHex(_pnlInfoBarBgColor.BackColor);
+            _settings.InfoBarHeight = (int)_numInfoBarHeight.Value;
+            _settings.InfoBarFontFamily = _cmbInfoBarFont.SelectedItem?.ToString() ?? "Segoe UI";
+            _settings.InfoBarFontSize = (int)_numInfoBarFontSize.Value;
+            _settings.InfoBarTextColor = ColorToHex(_pnlInfoBarTextColor.BackColor);
+            _settings.NewsApiKey = _txtNewsApiKey.Text;
+            _settings.NewsCountry = _txtNewsCountry.Text;
+            _settings.NewsUpdateIntervalMs = (int)_numNewsUpdateInterval.Value * 60000; // minuti a ms
+            _settings.WeatherApiKey = _txtWeatherApiKey.Text;
+            _settings.WeatherCity = _txtWeatherCity.Text;
+            _settings.WeatherUnits = _cmbWeatherUnits.SelectedItem?.ToString() ?? "metric";
+            _settings.WeatherUpdateIntervalMs = (int)_numWeatherUpdateInterval.Value * 60000; // minuti a ms
+
             await Database.SaveSettingsAsync(_settings);
 
             // Salva configurazione database
@@ -1246,5 +1671,104 @@ public class ConfigForm : Form
     private static string ColorToHex(Color c)
     {
         return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+    }
+
+    private async Task TestNewsApiAsync()
+    {
+        try
+        {
+            SetStatus("🔄 Testando News API...", Color.Blue);
+
+            if (string.IsNullOrEmpty(_txtNewsApiKey.Text))
+            {
+                SetStatus("❌ Inserisci prima la API Key delle notizie", Color.Red);
+                return;
+            }
+
+            using var httpClient = new System.Net.Http.HttpClient();
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DB-Next-Config/1.0");
+
+            var url = $"https://newsapi.org/v2/top-headlines?country={_txtNewsCountry.Text}&apiKey={_txtNewsApiKey.Text}";
+            var response = await httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                SetStatus($"❌ News API Error: {(int)response.StatusCode} - {errorContent}", Color.Red);
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "error")
+            {
+                var message = doc.RootElement.TryGetProperty("message", out var msg) ? msg.GetString() : "Errore sconosciuto";
+                SetStatus($"❌ News API: {message}", Color.Red);
+                return;
+            }
+
+            var articlesCount = doc.RootElement.TryGetProperty("articles", out var articles)
+                ? articles.GetArrayLength()
+                : 0;
+
+            SetStatus($"✅ News API OK! Trovate {articlesCount} notizie", Color.Green);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"❌ Errore test News API: {ex.Message}", Color.Red);
+        }
+    }
+
+    private async Task TestWeatherApiAsync()
+    {
+        try
+        {
+            SetStatus("🔄 Testando Weather API...", Color.Blue);
+
+            if (string.IsNullOrEmpty(_txtWeatherApiKey.Text))
+            {
+                SetStatus("❌ Inserisci prima la API Key del meteo", Color.Red);
+                return;
+            }
+
+            using var httpClient = new System.Net.Http.HttpClient();
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DB-Next-Config/1.0");
+
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={_txtWeatherCity.Text}&units={_cmbWeatherUnits.Text}&appid={_txtWeatherApiKey.Text}&lang=it";
+            var response = await httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    SetStatus("❌ Weather API: Chiave API non valida o non ancora attivata", Color.Red);
+                }
+                else
+                {
+                    SetStatus($"❌ Weather API Error: {(int)response.StatusCode}", Color.Red);
+                }
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("main", out var main) &&
+                main.TryGetProperty("temp", out var temp))
+            {
+                var temperature = temp.GetDouble();
+                var city = doc.RootElement.TryGetProperty("name", out var name) ? name.GetString() : _txtWeatherCity.Text;
+                SetStatus($"✅ Weather API OK! {city}: {temperature:F1}°C", Color.Green);
+            }
+            else
+            {
+                SetStatus("❌ Weather API: Risposta non valida", Color.Red);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"❌ Errore test Weather API: {ex.Message}", Color.Red);
+        }
     }
 }

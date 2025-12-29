@@ -58,10 +58,16 @@ static class Program
         switch (settings.ScreenMode.ToLower())
         {
             case "mirror":
-                // Una finestra per ogni monitor
-                foreach (var screen in Screen.AllScreens)
+                // Una finestra per ogni monitor esclusi quelli nella lista di esclusione
+                var excludedDisplays = ParseDisplayList(settings.MirrorExcludeDisplays);
+                for (int i = 0; i < Screen.AllScreens.Length; i++)
                 {
-                    var form = new MainForm(screen);
+                    var screen = Screen.AllScreens[i];
+                    // Salta i monitor nella lista di esclusione
+                    if (excludedDisplays.Contains(i))
+                        continue;
+
+                    var form = new MainForm(screen, settings, i);
                     if (mainForm == null) mainForm = form;
                     form.Show();
                 }
@@ -74,7 +80,7 @@ static class Program
                 {
                     if (idx >= 0 && idx < Screen.AllScreens.Length)
                     {
-                        var form = new MainForm(Screen.AllScreens[idx]);
+                        var form = new MainForm(Screen.AllScreens[idx], settings, idx);
                         if (mainForm == null) mainForm = form;
                         form.Show();
                     }
@@ -95,7 +101,7 @@ static class Program
                 Logger.Info($"Creazione MainForm su schermo {targetIdx}: {selectedScreen.Bounds.Width}x{selectedScreen.Bounds.Height} at ({selectedScreen.Bounds.X},{selectedScreen.Bounds.Y})");
                 try
                 {
-                    mainForm = new MainForm(selectedScreen);
+                    mainForm = new MainForm(selectedScreen, settings, targetIdx);
                     Logger.Info("MainForm creato");
                 }
                 catch (Exception ex)

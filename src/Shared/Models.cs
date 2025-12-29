@@ -35,6 +35,7 @@ public class QueueSettings
     public string ScreenMode { get; set; } = "single"; // single, mirror, multi
     public int TargetDisplayIndex { get; set; } = 0;
     public string MultiDisplayList { get; set; } = "0"; // es. "0,2"
+    public string MirrorExcludeDisplays { get; set; } = "0"; // Monitor da escludere in modalità mirror, es. "0" (touch screen)
     public string WindowMode { get; set; } = "borderless"; // fullscreen, borderless, windowed
     public int WindowWidth { get; set; } = 0; // 0 = auto
     public int WindowHeight { get; set; } = 0; // 0 = auto
@@ -77,6 +78,27 @@ public class QueueSettings
     public string MediaSchedulerFit { get; set; } = "cover"; // Adattamento per schedule
     public bool MediaSchedulerFolderMode { get; set; } = true; // Modalità cartella per schedule
     public int MediaSchedulerIntervalMs { get; set; } = 5000; // Intervallo slideshow per schedule
+
+    // Barra Informativa
+    public bool InfoBarEnabled { get; set; } = false; // Abilita/disabilita barra informativa
+    public string MirrorInfoBarDisplays { get; set; } = ""; // Monitor che mostrano la barra in modalità mirror, es. "1,2" (vuoto = tutti)
+    public string MirrorMarginTops { get; set; } = "0"; // Margini superiori per monitor in modalità mirror, es. "0,50,0,0" (monitor 0,1,2,3)
+    public string InfoBarBgColor { get; set; } = "#1a1a2e"; // Colore sfondo barra
+    public int InfoBarHeight { get; set; } = 40; // Altezza barra in pixel
+    public string InfoBarFontFamily { get; set; } = "Segoe UI"; // Font barra informativa
+    public int InfoBarFontSize { get; set; } = 12; // Dimensione font barra
+    public string InfoBarTextColor { get; set; } = "#ffffff"; // Colore testo barra
+
+    // API News (NewsAPI)
+    public string NewsApiKey { get; set; } = ""; // Chiave API NewsAPI
+    public string NewsCountry { get; set; } = "it"; // Paese per le notizie (codice ISO)
+    public int NewsUpdateIntervalMs { get; set; } = 300000; // Intervallo aggiornamento notizie (5 minuti)
+
+    // API Meteo (OpenWeatherMap)
+    public string WeatherApiKey { get; set; } = ""; // Chiave API OpenWeatherMap
+    public string WeatherCity { get; set; } = "Rome"; // Città per il meteo
+    public string WeatherUnits { get; set; } = "metric"; // Unità di misura (metric, imperial)
+    public int WeatherUpdateIntervalMs { get; set; } = 600000; // Intervallo aggiornamento meteo (10 minuti)
 
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
