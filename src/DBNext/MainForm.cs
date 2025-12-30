@@ -34,7 +34,10 @@ public class MainForm : Form
     // LibVLC
     private LibVLC? _libVLC;
     private MediaPlayer? _mediaPlayer;
-    
+
+    // Sintesi Vocale
+    private bool _speechInitialized = false;
+
     // Slideshow
     private string[] _slideshowFiles = Array.Empty<string>();
     private int _currentSlideIndex = 0;
@@ -238,6 +241,18 @@ public class MainForm : Form
     {
         try
         {
+            // Inizializza sintesi vocale
+            try
+            {
+                _speechInitialized = true;
+                Logger.Info("Sintesi vocale abilitata");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Sintesi vocale non disponibile: {ex.Message}");
+                _speechInitialized = false;
+            }
+
             // Inizializza LibVLC
             try
             {
@@ -610,6 +625,28 @@ public class MainForm : Form
     {
         _numberLabel.Text = number.ToString("00");
         UpdateNumberAndLabelLayout();
+
+        // Sintesi vocale se abilitata
+        if (_settings.VoiceEnabled && _speechInitialized)
+        {
+            try
+            {
+                string textToSpeak = $"SERVIAMO IL NUMERO {number}";
+                // Usa PowerShell per la sintesi vocale
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-Command \"Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{textToSpeak}')\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+                Logger.Info($"Sintesi vocale: {textToSpeak}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Errore sintesi vocale: {ex.Message}");
+            }
+        }
     }
     
     /// <summary>
@@ -1483,6 +1520,8 @@ public class MainForm : Form
             // Chiudi finestra operatore
             _operatorForm?.Hide();
             _operatorForm?.Dispose();
+
+            // Sintesi vocale pulita automaticamente
 
             // Pulisci LibVLC
             _mediaPlayer?.Stop();

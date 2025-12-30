@@ -47,7 +47,10 @@ public class QueueSettings
     public bool NumberFontBold { get; set; } = true;
     public string NumberColor { get; set; } = "#FFC832"; // Giallo dorato
     public string NumberBgColor { get; set; } = "#14141E"; // Scuro
-    
+
+    // Sintesi Vocale
+    public bool VoiceEnabled { get; set; } = false; // Abilita/disabilita la voce al cambio numero
+
     // Scritta sopra/sotto il numero
     public string NumberLabelText { get; set; } = ""; // es. "Ora serviamo il numero"
     public string NumberLabelColor { get; set; } = "#FFFFFF";

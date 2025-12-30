@@ -45,6 +45,9 @@ public class ConfigForm : Form
     // Numero corrente
     private NumericUpDown _numCurrentNumber = null!;
 
+    // Sintesi Vocale
+    private CheckBox _chkVoiceEnabled = null!;
+
     // Database Connection
     private TextBox _txtDbServer = null!;
     private NumericUpDown _numDbPort = null!;
@@ -578,6 +581,20 @@ public class ConfigForm : Form
         pollingLayout.Controls.Add(_numPollMs);
         grpPolling.Controls.Add(pollingLayout);
         sistemaLayout.Controls.Add(grpPolling);
+
+        // === Sezione Sintesi Vocale ===
+        var grpVoice = CreateGroupBox("Sintesi Vocale");
+        var voiceLayout = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        _chkVoiceEnabled = new CheckBox
+        {
+            Text = "Abilita voce al cambio numero (pronuncia \"SERVIAMO IL NUMERO X\")",
+            AutoSize = true,
+            ForeColor = Color.White,
+            Checked = false
+        };
+        voiceLayout.Controls.Add(_chkVoiceEnabled);
+        grpVoice.Controls.Add(voiceLayout);
+        sistemaLayout.Controls.Add(grpVoice);
 
         // === Sezione Numero Corrente ===
         var grpNumber = CreateGroupBox("Numero Corrente");
@@ -1165,6 +1182,9 @@ public class ConfigForm : Form
             
             // Polling
             _numPollMs.Value = _settings.PollMs;
+
+            // Sintesi Vocale
+            _chkVoiceEnabled.Checked = _settings.VoiceEnabled;
             
             // Stile Numero
             _cmbNumberFont.SelectedItem = _settings.NumberFontFamily;
@@ -1380,6 +1400,9 @@ public class ConfigForm : Form
             
             // Polling
             _settings.PollMs = (int)_numPollMs.Value;
+
+            // Sintesi Vocale
+            _settings.VoiceEnabled = _chkVoiceEnabled.Checked;
             
             // Stile Numero
             _settings.NumberFontFamily = _cmbNumberFont.SelectedItem?.ToString() ?? "Arial Black";

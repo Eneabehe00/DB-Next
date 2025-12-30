@@ -343,8 +343,8 @@ public static class Database
                        media_scheduler_folder_mode, media_scheduler_interval_ms,
                        info_bar_enabled, info_bar_bg_color, info_bar_height, info_bar_font_family,
                        info_bar_font_size, info_bar_text_color, news_api_key, news_country,
-                       news_update_interval_ms, weather_api_key, weather_city, weather_units,
-                       weather_update_interval_ms, updated_at
+                       news_update_interval_ms,                        weather_api_key, weather_city, weather_units,
+                       weather_update_interval_ms, voice_enabled, updated_at
                 FROM queue_settings WHERE id = 1", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             
@@ -417,7 +417,10 @@ public static class Database
                     WeatherUnits = reader.IsDBNull(60) ? "metric" : reader.GetString(60),
                     WeatherUpdateIntervalMs = reader.IsDBNull(61) ? 600000 : reader.GetInt32(61),
 
-                    UpdatedAt = reader.IsDBNull(62) ? DateTime.Now : reader.GetDateTime(62)
+                    // Sintesi Vocale
+                    VoiceEnabled = reader.IsDBNull(62) ? false : reader.GetInt32(62) == 1,
+
+                    UpdatedAt = reader.IsDBNull(63) ? DateTime.Now : reader.GetDateTime(63)
                 };
             }
         }
@@ -501,7 +504,8 @@ public static class Database
                     weather_api_key = @weather_api_key,
                     weather_city = @weather_city,
                     weather_units = @weather_units,
-                    weather_update_interval_ms = @weather_update_interval_ms
+                    weather_update_interval_ms = @weather_update_interval_ms,
+                    voice_enabled = @voice_enabled
                 WHERE id = 1", conn);
             
             cmd.Parameters.AddWithValue("@media_path", settings.MediaPath ?? "");
@@ -567,6 +571,7 @@ public static class Database
             cmd.Parameters.AddWithValue("@weather_city", settings.WeatherCity ?? "Rome");
             cmd.Parameters.AddWithValue("@weather_units", settings.WeatherUnits ?? "metric");
             cmd.Parameters.AddWithValue("@weather_update_interval_ms", settings.WeatherUpdateIntervalMs);
+            cmd.Parameters.AddWithValue("@voice_enabled", settings.VoiceEnabled ? 1 : 0);
 
             await cmd.ExecuteNonQueryAsync();
             Logger.Info("Impostazioni salvate");

@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     operator_always_on_top TINYINT(1) DEFAULT 1 COMMENT 'Finestra operatore sempre in primo piano',
     operator_label_text VARCHAR(50) DEFAULT 'TURNO' COMMENT 'Testo etichetta finestra operatore',
 
+    -- Sintesi Vocale
+    voice_enabled TINYINT(1) DEFAULT 0 COMMENT 'Abilita voce al cambio numero',
+
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id)
@@ -605,7 +608,17 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN weather_update_interval_ms INT DEFAULT 600000;
     END IF;
 
-    SELECT 'Schema aggiornato con successo - inclusa finestra operatore, scheduler media e barra informativa' AS status;
+    -- Colonna per sintesi vocale
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'voice_enabled'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN voice_enabled TINYINT(1) DEFAULT 0;
+    END IF;
+
+    SELECT 'Schema aggiornato con successo - inclusa finestra operatore, scheduler media, barra informativa e sintesi vocale' AS status;
 END//
 
 DELIMITER ;
