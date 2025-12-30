@@ -631,7 +631,9 @@ public class MainForm : Form
         {
             try
             {
-                string textToSpeak = $"SERVIAMO IL NUMERO {number}";
+                string textToSpeak = string.IsNullOrWhiteSpace(_settings.VoicePrefix)
+                    ? $"SERVIAMO IL NUMERO {number}"
+                    : $"{_settings.VoicePrefix} {number}";
                 // Usa PowerShell per la sintesi vocale
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {

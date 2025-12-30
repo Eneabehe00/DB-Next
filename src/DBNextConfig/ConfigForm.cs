@@ -47,6 +47,7 @@ public class ConfigForm : Form
 
     // Sintesi Vocale
     private CheckBox _chkVoiceEnabled = null!;
+    private TextBox _txtVoicePrefix = null!;
 
     // Database Connection
     private TextBox _txtDbServer = null!;
@@ -593,6 +594,27 @@ public class ConfigForm : Form
             Checked = false
         };
         voiceLayout.Controls.Add(_chkVoiceEnabled);
+
+        // A capo dopo il checkbox
+        voiceLayout.SetFlowBreak(_chkVoiceEnabled, true);
+
+        var lblVoicePrefix = new Label
+        {
+            Text = "Prefisso vocale:",
+            AutoSize = true,
+            ForeColor = Color.White,
+            Margin = new Padding(0, 5, 0, 0)
+        };
+        voiceLayout.Controls.Add(lblVoicePrefix);
+
+        _txtVoicePrefix = new TextBox
+        {
+            Width = 300,
+            Text = "",
+            PlaceholderText = "Es: \"Ora serviamo il numero\""
+        };
+        voiceLayout.Controls.Add(_txtVoicePrefix);
+
         grpVoice.Controls.Add(voiceLayout);
         sistemaLayout.Controls.Add(grpVoice);
 
@@ -1185,6 +1207,7 @@ public class ConfigForm : Form
 
             // Sintesi Vocale
             _chkVoiceEnabled.Checked = _settings.VoiceEnabled;
+            _txtVoicePrefix.Text = _settings.VoicePrefix;
             
             // Stile Numero
             _cmbNumberFont.SelectedItem = _settings.NumberFontFamily;
@@ -1403,6 +1426,7 @@ public class ConfigForm : Form
 
             // Sintesi Vocale
             _settings.VoiceEnabled = _chkVoiceEnabled.Checked;
+            _settings.VoicePrefix = _txtVoicePrefix.Text;
             
             // Stile Numero
             _settings.NumberFontFamily = _cmbNumberFont.SelectedItem?.ToString() ?? "Arial Black";

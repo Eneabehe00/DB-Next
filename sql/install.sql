@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS queue_settings (
 
     -- Sintesi Vocale
     voice_enabled TINYINT(1) DEFAULT 0 COMMENT 'Abilita voce al cambio numero',
+    voice_prefix VARCHAR(200) DEFAULT '' COMMENT 'Prefisso da pronunciare prima del numero (es. Ora serviamo il numero)',
 
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -618,7 +619,17 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN voice_enabled TINYINT(1) DEFAULT 0;
     END IF;
 
-    SELECT 'Schema aggiornato con successo - inclusa finestra operatore, scheduler media, barra informativa e sintesi vocale' AS status;
+    -- Colonna per prefisso vocale
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'queue_settings'
+          AND COLUMN_NAME = 'voice_prefix'
+    ) THEN
+        ALTER TABLE queue_settings ADD COLUMN voice_prefix VARCHAR(200) DEFAULT '';
+    END IF;
+
+    SELECT 'Schema aggiornato con successo - inclusa finestra operatore, scheduler media, barra informativa e sintesi vocale con prefisso' AS status;
 END//
 
 DELIMITER ;

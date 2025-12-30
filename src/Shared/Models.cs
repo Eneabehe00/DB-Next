@@ -50,6 +50,7 @@ public class QueueSettings
 
     // Sintesi Vocale
     public bool VoiceEnabled { get; set; } = false; // Abilita/disabilita la voce al cambio numero
+    public string VoicePrefix { get; set; } = ""; // Prefisso da pronunciare prima del numero (es. "Ora serviamo il numero")
 
     // Scritta sopra/sotto il numero
     public string NumberLabelText { get; set; } = ""; // es. "Ora serviamo il numero"
