@@ -544,32 +544,14 @@ BEGIN
         ALTER TABLE queue_settings ADD COLUMN mirror_margin_tops VARCHAR(100) DEFAULT '0';
     END IF;
 
-    -- Colonne per API News
+    -- Colonna per RSS News (sostituisce API News)
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'queue_settings'
-          AND COLUMN_NAME = 'news_api_key'
+          AND COLUMN_NAME = 'news_rss_update_interval_ms'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN news_api_key VARCHAR(200) DEFAULT '';
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'queue_settings'
-          AND COLUMN_NAME = 'news_country'
-    ) THEN
-        ALTER TABLE queue_settings ADD COLUMN news_country VARCHAR(10) DEFAULT 'it';
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'queue_settings'
-          AND COLUMN_NAME = 'news_update_interval_ms'
-    ) THEN
-        ALTER TABLE queue_settings ADD COLUMN news_update_interval_ms INT DEFAULT 300000;
+        ALTER TABLE queue_settings ADD COLUMN news_rss_update_interval_ms INT DEFAULT 3600000 COMMENT 'Intervallo aggiornamento RSS in millisecondi (default: 1 ora)';
     END IF;
 
     -- Colonne per API Meteo

@@ -78,9 +78,7 @@ public class ConfigForm : Form
     private ComboBox _cmbInfoBarFont = null!;
     private NumericUpDown _numInfoBarFontSize = null!;
     private Panel _pnlInfoBarTextColor = null!;
-    private TextBox _txtNewsApiKey = null!;
-    private TextBox _txtNewsCountry = null!;
-    private NumericUpDown _numNewsUpdateInterval = null!;
+    private NumericUpDown _numNewsRssUpdateInterval = null!;
     private TextBox _txtWeatherApiKey = null!;
     private TextBox _txtWeatherCity = null!;
     private ComboBox _cmbWeatherUnits = null!;
@@ -301,32 +299,21 @@ public class ConfigForm : Form
         grpInfoBar.Controls.Add(infoBarSettingsLayout);
         infoBarLayout.Controls.Add(grpInfoBar);
 
-        // === Sezione API News ===
-        var grpNewsApi = CreateGroupBox("API Notizie (NewsAPI.org)");
-        var newsApiLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3, AutoSize = true };
+        // === Sezione RSS Notizie ===
+        var grpNewsRss = CreateGroupBox("RSS Notizie (Ansa.it)");
+        var newsRssLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, AutoSize = true };
 
-        // Riga 0: API Key
-        newsApiLayout.Controls.Add(new Label { Text = "API Key:", AutoSize = true }, 0, 0);
-        _txtNewsApiKey = new TextBox { Width = 200, UseSystemPasswordChar = true };
-        newsApiLayout.SetColumnSpan(_txtNewsApiKey, 3);
-        newsApiLayout.Controls.Add(_txtNewsApiKey, 1, 0);
+        // Riga 0: Info RSS
+        newsRssLayout.Controls.Add(new Label { Text = "Feed RSS automatici da Ansa.it (6 categorie)", AutoSize = true }, 0, 0);
+        newsRssLayout.SetColumnSpan(newsRssLayout.Controls[0], 2);
 
-        // Riga 1: Paese e intervallo
-        newsApiLayout.Controls.Add(new Label { Text = "Paese:", AutoSize = true }, 0, 1);
-        _txtNewsCountry = new TextBox { Width = 40, Text = "it" };
-        newsApiLayout.Controls.Add(_txtNewsCountry, 1, 1);
+        // Riga 1: Intervallo aggiornamento
+        newsRssLayout.Controls.Add(new Label { Text = "Aggiornamento (ore):", AutoSize = true }, 0, 1);
+        _numNewsRssUpdateInterval = new NumericUpDown { Minimum = 1, Maximum = 24, Value = 1, Width = 60 };
+        newsRssLayout.Controls.Add(_numNewsRssUpdateInterval, 1, 1);
 
-        newsApiLayout.Controls.Add(new Label { Text = "Aggiornamento (min):", AutoSize = true }, 2, 1);
-        _numNewsUpdateInterval = new NumericUpDown { Minimum = 1, Maximum = 60, Value = 5, Width = 60 };
-        newsApiLayout.Controls.Add(_numNewsUpdateInterval, 3, 1);
-
-        // Riga 2: Pulsante test
-        var btnTestNews = new Button { Text = "Test News API", Width = 120, Height = 25 };
-        btnTestNews.Click += async (s, e) => await TestNewsApiAsync();
-        newsApiLayout.Controls.Add(btnTestNews, 0, 2);
-
-        grpNewsApi.Controls.Add(newsApiLayout);
-        infoBarLayout.Controls.Add(grpNewsApi);
+        grpNewsRss.Controls.Add(newsRssLayout);
+        infoBarLayout.Controls.Add(grpNewsRss);
 
         // === Sezione API Meteo ===
         var grpWeatherApi = CreateGroupBox("API Meteo (OpenWeatherMap.org)");
@@ -1133,9 +1120,7 @@ public class ConfigForm : Form
         _cmbInfoBarFont.Enabled = enabled;
         _numInfoBarFontSize.Enabled = enabled;
         _pnlInfoBarTextColor.Enabled = enabled;
-        _txtNewsApiKey.Enabled = enabled;
-        _txtNewsCountry.Enabled = enabled;
-        _numNewsUpdateInterval.Enabled = enabled;
+        _numNewsRssUpdateInterval.Enabled = enabled;
         _txtWeatherApiKey.Enabled = enabled;
         _txtWeatherCity.Enabled = enabled;
         _cmbWeatherUnits.Enabled = enabled;
@@ -1249,9 +1234,8 @@ public class ConfigForm : Form
             if (_cmbInfoBarFont.SelectedIndex < 0) _cmbInfoBarFont.SelectedIndex = 0;
             _numInfoBarFontSize.Value = Math.Max(8, Math.Min(24, _settings.InfoBarFontSize));
             _pnlInfoBarTextColor.BackColor = ColorFromHex(_settings.InfoBarTextColor);
-            _txtNewsApiKey.Text = _settings.NewsApiKey;
-            _txtNewsCountry.Text = _settings.NewsCountry ?? "it";
-            _numNewsUpdateInterval.Value = Math.Max(1, Math.Min(60, _settings.NewsUpdateIntervalMs / 60000));
+            _numNewsRssUpdateInterval.Value = Math.Max(1, Math.Min(24, _settings.NewsRssUpdateIntervalMs / 3600000)); // ore
+            Logger.Info($"Caricate impostazioni RSS - Intervallo: {_settings.NewsRssUpdateIntervalMs}ms ({_settings.NewsRssUpdateIntervalMs / 3600000}h)");
             _txtWeatherApiKey.Text = _settings.WeatherApiKey;
             _txtWeatherCity.Text = _settings.WeatherCity ?? "Rome";
             _cmbWeatherUnits.SelectedItem = _settings.WeatherUnits ?? "metric";
@@ -1463,14 +1447,13 @@ public class ConfigForm : Form
             _settings.InfoBarFontFamily = _cmbInfoBarFont.SelectedItem?.ToString() ?? "Segoe UI";
             _settings.InfoBarFontSize = (int)_numInfoBarFontSize.Value;
             _settings.InfoBarTextColor = ColorToHex(_pnlInfoBarTextColor.BackColor);
-            _settings.NewsApiKey = _txtNewsApiKey.Text;
-            _settings.NewsCountry = _txtNewsCountry.Text;
-            _settings.NewsUpdateIntervalMs = (int)_numNewsUpdateInterval.Value * 60000; // minuti a ms
+            _settings.NewsRssUpdateIntervalMs = (int)_numNewsRssUpdateInterval.Value * 3600000; // ore a ms
             _settings.WeatherApiKey = _txtWeatherApiKey.Text;
             _settings.WeatherCity = _txtWeatherCity.Text;
             _settings.WeatherUnits = _cmbWeatherUnits.SelectedItem?.ToString() ?? "metric";
             _settings.WeatherUpdateIntervalMs = (int)_numWeatherUpdateInterval.Value * 60000; // minuti a ms
 
+            Logger.Info($"Salvando impostazioni RSS - Intervallo: {_settings.NewsRssUpdateIntervalMs}ms ({_settings.NewsRssUpdateIntervalMs / 3600000}h)");
             await Database.SaveSettingsAsync(_settings);
 
             // Salva configurazione database
@@ -1720,52 +1703,6 @@ public class ConfigForm : Form
         return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
     }
 
-    private async Task TestNewsApiAsync()
-    {
-        try
-        {
-            SetStatus("🔄 Testando News API...", Color.Blue);
-
-            if (string.IsNullOrEmpty(_txtNewsApiKey.Text))
-            {
-                SetStatus("❌ Inserisci prima la API Key delle notizie", Color.Red);
-                return;
-            }
-
-            using var httpClient = new System.Net.Http.HttpClient();
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DB-Next-Config/1.0");
-
-            var url = $"https://newsapi.org/v2/top-headlines?country={_txtNewsCountry.Text}&apiKey={_txtNewsApiKey.Text}";
-            var response = await httpClient.GetAsync(url);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                SetStatus($"❌ News API Error: {(int)response.StatusCode} - {errorContent}", Color.Red);
-                return;
-            }
-
-            var json = await response.Content.ReadAsStringAsync();
-            var doc = System.Text.Json.JsonDocument.Parse(json);
-
-            if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "error")
-            {
-                var message = doc.RootElement.TryGetProperty("message", out var msg) ? msg.GetString() : "Errore sconosciuto";
-                SetStatus($"❌ News API: {message}", Color.Red);
-                return;
-            }
-
-            var articlesCount = doc.RootElement.TryGetProperty("articles", out var articles)
-                ? articles.GetArrayLength()
-                : 0;
-
-            SetStatus($"✅ News API OK! Trovate {articlesCount} notizie", Color.Green);
-        }
-        catch (Exception ex)
-        {
-            SetStatus($"❌ Errore test News API: {ex.Message}", Color.Red);
-        }
-    }
 
     private async Task TestWeatherApiAsync()
     {

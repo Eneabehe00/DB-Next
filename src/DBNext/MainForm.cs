@@ -1,6 +1,7 @@
 using System.Drawing.Drawing2D;
 using System.Net.Http;
 using System.Text.Json;
+using System.Xml.Linq;
 using DBNext.Shared;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
@@ -493,10 +494,17 @@ public class MainForm : Form
                 var newSettings = await Database.GetSettingsAsync();
                 if (newSettings.UpdatedAt != _settings.UpdatedAt)
                 {
+                    Logger.Info($"Rilevate nuove impostazioni - UpdatedAt: {_settings.UpdatedAt} -> {newSettings.UpdatedAt}");
+
                     var oldMarginTop = _settings.WindowMarginTop;
+                    var oldNewsInterval = _settings.NewsRssUpdateIntervalMs;
+                    var oldInfoBarEnabled = _settings.InfoBarEnabled;
+
                     _settings = newSettings;
                     _pollTimer.Interval = Math.Max(100, _settings.PollMs);
                     _slideshowTimer.Interval = Math.Max(1000, _settings.SlideshowIntervalMs);
+
+                    Logger.Info($"Nuovo intervallo RSS: {oldNewsInterval}ms -> {_settings.NewsRssUpdateIntervalMs}ms");
 
                     this.Invoke(() =>
                     {
@@ -509,6 +517,13 @@ public class MainForm : Form
                         UpdateLayout();
                         LoadMedia();
                         UpdateOperatorWindow();
+
+                        // Se è cambiato l'intervallo RSS o lo stato della barra informativa, aggiorna la barra
+                        if (oldNewsInterval != _settings.NewsRssUpdateIntervalMs || oldInfoBarEnabled != _settings.InfoBarEnabled)
+                        {
+                            Logger.Info("Aggiornamento barra informativa per cambiamenti RSS");
+                            UpdateInfoBar();
+                        }
                     });
                 }
                 _lastSettingsCheck = DateTime.Now;
@@ -1219,7 +1234,8 @@ public class MainForm : Form
                 _newsLabel.Location = new Point(490, 0); // Aggiornato per riflettere il nuovo spazio del meteo
                 _newsLabel.Width = Math.Max(200, this.Width - 490); // Assicurati che abbia almeno 200px
 
-                // Avvia timer se necessario
+                // Ferma e riavvia i timer per prendere eventuali nuovi intervalli
+                StopInfoBar();
                 StartInfoBar();
             }
             else
@@ -1243,17 +1259,18 @@ public class MainForm : Form
         {
             _timeTimer.Start();
 
-            if (!string.IsNullOrEmpty(_settings.NewsApiKey))
+            // RSS Ansa.it - sempre disponibile se barra informativa abilitata
+            if (_settings.InfoBarEnabled)
             {
-                _newsTimer.Interval = _settings.NewsUpdateIntervalMs;
+                _newsTimer.Interval = _settings.NewsRssUpdateIntervalMs;
                 _newsTimer.Start();
-                _newsChangeTimer.Start(); // Nuovo timer per cambio notizia invece di scrolling
+                _newsChangeTimer.Start();
                 // Scarica notizie iniziali
                 _ = UpdateNewsAsync();
             }
             else
             {
-                _newsLabel.Text = "API News non configurata";
+                _newsLabel.Text = "Barra informativa non abilitata";
             }
 
             if (!string.IsNullOrEmpty(_settings.WeatherApiKey))
@@ -1309,63 +1326,110 @@ public class MainForm : Form
     {
         try
         {
-            if (string.IsNullOrEmpty(_settings.NewsApiKey))
-                return;
+            Logger.Info("Inizio caricamento RSS Ansa.it");
 
-            var url = $"https://newsapi.org/v2/top-headlines?country={_settings.NewsCountry}&apiKey={_settings.NewsApiKey}";
-            Logger.Info($"Richiesta NewsAPI: {url}");
-
-            var response = await _httpClient.GetAsync(url);
-            Logger.Info($"NewsAPI response status: {response.StatusCode}");
-
-            if (!response.IsSuccessStatusCode)
+            // Definizione categorie RSS Ansa.it con URL
+            var rssFeeds = new[]
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Logger.Error($"NewsAPI error: {response.StatusCode} - {errorContent}");
-                _newsHeadlines.Clear();
-                _newsHeadlines.Add($"Errore API: {response.StatusCode}");
-                return;
+                new { Category = "Ultima Ora", Url = "https://www.ansa.it/sito/ansait/rss.xml" },
+                new { Category = "Cronaca", Url = "https://www.ansa.it/sito/notizie/cronaca/cronaca_rss.xml" },
+                new { Category = "Politica", Url = "https://www.ansa.it/sito/notizie/politica/politica_rss.xml" },
+                new { Category = "Mondo", Url = "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml" },
+                new { Category = "Economia", Url = "https://www.ansa.it/sito/notizie/economia/economia_rss.xml" },
+                new { Category = "Sport", Url = "https://www.ansa.it/sito/notizie/sport/sport_rss.xml" }
+            };
+
+            var allNews = new List<(string Category, string Title, string Description, DateTime PubDate)>();
+
+            // Scarica da tutti i feed RSS
+            foreach (var feed in rssFeeds)
+            {
+                try
+                {
+                    Logger.Info($"Caricamento RSS {feed.Category}: {feed.Url}");
+
+                    var response = await _httpClient.GetAsync(feed.Url);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Logger.Warn($"RSS {feed.Category} non disponibile: {response.StatusCode}");
+                        continue;
+                    }
+
+                    var xmlContent = await response.Content.ReadAsStringAsync();
+                    var rssDoc = XDocument.Parse(xmlContent);
+
+                    // Estrai il primo item (notizia più recente) da ogni categoria
+                    var firstItem = rssDoc.Descendants("item").FirstOrDefault();
+                    if (firstItem != null)
+                    {
+                        var title = firstItem.Element("title")?.Value ?? "";
+                        var description = firstItem.Element("description")?.Value ?? "";
+                        var pubDateStr = firstItem.Element("pubDate")?.Value ?? "";
+
+                        // Parse data pubblicazione
+                        DateTime pubDate = DateTime.MinValue;
+                        if (!string.IsNullOrEmpty(pubDateStr))
+                        {
+                            try
+                            {
+                                // Formato RSS: "Wed, 01 Jan 2020 12:00:00 +0000"
+                                pubDate = DateTime.Parse(pubDateStr);
+                            }
+                            catch
+                            {
+                                // Fallback: usa data corrente se parsing fallisce
+                                pubDate = DateTime.Now;
+                            }
+                        }
+
+                        // Pulisci e limita testo
+                        title = System.Web.HttpUtility.HtmlDecode(title.Trim());
+                        description = System.Web.HttpUtility.HtmlDecode(description.Trim());
+
+                        // Rimuovi tag HTML dalla descrizione
+                        description = System.Text.RegularExpressions.Regex.Replace(description, "<[^>]+>", "");
+
+                        // Limita lunghezze
+                        if (title.Length > 100) title = title.Substring(0, 97) + "...";
+                        if (description.Length > 150) description = description.Substring(0, 147) + "...";
+
+                        if (!string.IsNullOrEmpty(title))
+                        {
+                            allNews.Add((feed.Category, title, description, pubDate));
+                            Logger.Info($"RSS {feed.Category}: '{title}'");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Errore caricamento RSS {feed.Category}: {ex.Message}");
+                }
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            Logger.Info($"NewsAPI response JSON length: {json.Length}");
-
-            var doc = JsonDocument.Parse(json);
-
-            // Controlla se c'è un errore nella risposta
-            if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() != "ok")
-            {
-                var errorMessage = doc.RootElement.TryGetProperty("message", out var message)
-                    ? message.GetString()
-                    : "Errore sconosciuto";
-                Logger.Error($"NewsAPI error message: {errorMessage}");
-                _newsHeadlines.Clear();
-                _newsHeadlines.Add($"Errore: {errorMessage}");
-                return;
-            }
+            // Ordina per data pubblicazione (più recenti prima)
+            allNews = allNews.OrderByDescending(n => n.PubDate).ToList();
 
             _newsHeadlines.Clear();
 
-            if (doc.RootElement.TryGetProperty("articles", out var articles))
+            // Crea headlines nel formato "CATEGORIA: TITOLO - DESCRIZIONE"
+            foreach (var news in allNews)
             {
-                foreach (var article in articles.EnumerateArray())
+                var headline = $"{news.Category}: {news.Title}";
+                if (!string.IsNullOrEmpty(news.Description))
                 {
-                    if (article.TryGetProperty("title", out var title) && !string.IsNullOrEmpty(title.GetString()))
-                    {
-                        _newsHeadlines.Add(title.GetString()!);
-                    }
+                    headline += $" - {news.Description}";
                 }
-                Logger.Info($"NewsAPI: trovate {articles.GetArrayLength()} articoli");
-            }
-            else
-            {
-                Logger.Warn("NewsAPI: proprietà 'articles' non trovata nella risposta");
+                _newsHeadlines.Add(headline);
             }
 
             if (_newsHeadlines.Count == 0)
             {
-                _newsHeadlines.Add("Nessuna notizia disponibile");
-                Logger.Info("NewsAPI: nessuna notizia valida trovata");
+                _newsHeadlines.Add("Nessuna notizia disponibile da Ansa.it");
+                Logger.Info("RSS Ansa.it: nessuna notizia caricata");
+            }
+            else
+            {
+                Logger.Info($"RSS Ansa.it: caricate {_newsHeadlines.Count} notizie da {rssFeeds.Length} categorie");
             }
 
             _currentNewsIndex = 0;
@@ -1375,12 +1439,10 @@ public class MainForm : Form
             {
                 _newsLabel.Text = _newsHeadlines[0];
             }
-
-            Logger.Info($"NewsAPI: {_newsHeadlines.Count} notizie caricate");
         }
         catch (Exception ex)
         {
-            Logger.Error($"Errore caricamento notizie: {ex.Message}");
+            Logger.Error($"Errore caricamento RSS Ansa.it: {ex.Message}");
             Logger.Error($"Stack trace: {ex.StackTrace}");
             _newsHeadlines.Clear();
             _newsHeadlines.Add("Errore caricamento notizie");

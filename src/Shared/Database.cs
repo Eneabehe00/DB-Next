@@ -97,9 +97,7 @@ public static class Database
                     info_bar_font_family VARCHAR(100) DEFAULT 'Segoe UI',
                     info_bar_font_size INT DEFAULT 12,
                     info_bar_text_color VARCHAR(20) DEFAULT '#ffffff',
-                    news_api_key VARCHAR(200) DEFAULT '',
-                    news_country VARCHAR(10) DEFAULT 'it',
-                    news_update_interval_ms INT DEFAULT 300000,
+                    news_rss_update_interval_ms INT DEFAULT 3600000,
                     weather_api_key VARCHAR(200) DEFAULT '',
                     weather_city VARCHAR(100) DEFAULT 'Rome',
                     weather_units VARCHAR(20) DEFAULT 'metric',
@@ -149,9 +147,7 @@ public static class Database
                 ADD COLUMN IF NOT EXISTS info_bar_font_family VARCHAR(100) DEFAULT 'Segoe UI',
                 ADD COLUMN IF NOT EXISTS info_bar_font_size INT DEFAULT 12,
                 ADD COLUMN IF NOT EXISTS info_bar_text_color VARCHAR(20) DEFAULT '#ffffff',
-                ADD COLUMN IF NOT EXISTS news_api_key VARCHAR(200) DEFAULT '',
-                ADD COLUMN IF NOT EXISTS news_country VARCHAR(10) DEFAULT 'it',
-                ADD COLUMN IF NOT EXISTS news_update_interval_ms INT DEFAULT 300000,
+                ADD COLUMN IF NOT EXISTS news_rss_update_interval_ms INT DEFAULT 3600000,
                 ADD COLUMN IF NOT EXISTS weather_api_key VARCHAR(200) DEFAULT '',
                 ADD COLUMN IF NOT EXISTS weather_city VARCHAR(100) DEFAULT 'Rome',
                 ADD COLUMN IF NOT EXISTS weather_units VARCHAR(20) DEFAULT 'metric',
@@ -342,8 +338,8 @@ public static class Database
                        media_scheduler_path, media_scheduler_type, media_scheduler_fit,
                        media_scheduler_folder_mode, media_scheduler_interval_ms,
                        info_bar_enabled, info_bar_bg_color, info_bar_height, info_bar_font_family,
-                       info_bar_font_size, info_bar_text_color, news_api_key, news_country,
-                       news_update_interval_ms,                        weather_api_key, weather_city, weather_units,
+                       info_bar_font_size, info_bar_text_color, news_rss_update_interval_ms,
+                       weather_api_key, weather_city, weather_units,
                        weather_update_interval_ms, voice_enabled, voice_prefix, updated_at
                 FROM queue_settings WHERE id = 1", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -409,19 +405,17 @@ public static class Database
                     InfoBarFontFamily = reader.IsDBNull(52) ? "Segoe UI" : reader.GetString(52),
                     InfoBarFontSize = reader.IsDBNull(53) ? 12 : reader.GetInt32(53),
                     InfoBarTextColor = reader.IsDBNull(54) ? "#ffffff" : reader.GetString(54),
-                    NewsApiKey = reader.IsDBNull(55) ? "" : reader.GetString(55),
-                    NewsCountry = reader.IsDBNull(56) ? "it" : reader.GetString(56),
-                    NewsUpdateIntervalMs = reader.IsDBNull(57) ? 300000 : reader.GetInt32(57),
-                    WeatherApiKey = reader.IsDBNull(58) ? "" : reader.GetString(58),
-                    WeatherCity = reader.IsDBNull(59) ? "Rome" : reader.GetString(59),
-                    WeatherUnits = reader.IsDBNull(60) ? "metric" : reader.GetString(60),
-                    WeatherUpdateIntervalMs = reader.IsDBNull(61) ? 600000 : reader.GetInt32(61),
+                    NewsRssUpdateIntervalMs = reader.IsDBNull(55) ? 3600000 : reader.GetInt32(55),
+                    WeatherApiKey = reader.IsDBNull(56) ? "" : reader.GetString(56),
+                    WeatherCity = reader.IsDBNull(57) ? "Rome" : reader.GetString(57),
+                    WeatherUnits = reader.IsDBNull(58) ? "metric" : reader.GetString(58),
+                    WeatherUpdateIntervalMs = reader.IsDBNull(59) ? 600000 : reader.GetInt32(59),
 
                     // Sintesi Vocale
-                    VoiceEnabled = reader.IsDBNull(62) ? false : reader.GetInt32(62) == 1,
-                    VoicePrefix = reader.IsDBNull(63) ? "" : reader.GetString(63),
+                    VoiceEnabled = reader.IsDBNull(60) ? false : reader.GetInt32(60) == 1,
+                    VoicePrefix = reader.IsDBNull(61) ? "" : reader.GetString(61),
 
-                    UpdatedAt = reader.IsDBNull(64) ? DateTime.Now : reader.GetDateTime(64)
+                    UpdatedAt = reader.IsDBNull(62) ? DateTime.Now : reader.GetDateTime(62)
                 };
             }
         }
@@ -499,9 +493,7 @@ public static class Database
                     info_bar_font_family = @info_bar_font_family,
                     info_bar_font_size = @info_bar_font_size,
                     info_bar_text_color = @info_bar_text_color,
-                    news_api_key = @news_api_key,
-                    news_country = @news_country,
-                    news_update_interval_ms = @news_update_interval_ms,
+                    news_rss_update_interval_ms = @news_rss_update_interval_ms,
                     weather_api_key = @weather_api_key,
                     weather_city = @weather_city,
                     weather_units = @weather_units,
@@ -566,9 +558,7 @@ public static class Database
             cmd.Parameters.AddWithValue("@info_bar_font_family", settings.InfoBarFontFamily ?? "Segoe UI");
             cmd.Parameters.AddWithValue("@info_bar_font_size", settings.InfoBarFontSize);
             cmd.Parameters.AddWithValue("@info_bar_text_color", settings.InfoBarTextColor ?? "#ffffff");
-            cmd.Parameters.AddWithValue("@news_api_key", settings.NewsApiKey ?? "");
-            cmd.Parameters.AddWithValue("@news_country", settings.NewsCountry ?? "it");
-            cmd.Parameters.AddWithValue("@news_update_interval_ms", settings.NewsUpdateIntervalMs);
+            cmd.Parameters.AddWithValue("@news_rss_update_interval_ms", settings.NewsRssUpdateIntervalMs);
             cmd.Parameters.AddWithValue("@weather_api_key", settings.WeatherApiKey ?? "");
             cmd.Parameters.AddWithValue("@weather_city", settings.WeatherCity ?? "Rome");
             cmd.Parameters.AddWithValue("@weather_units", settings.WeatherUnits ?? "metric");

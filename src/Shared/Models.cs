@@ -93,10 +93,8 @@ public class QueueSettings
     public int InfoBarFontSize { get; set; } = 12; // Dimensione font barra
     public string InfoBarTextColor { get; set; } = "#ffffff"; // Colore testo barra
 
-    // API News (NewsAPI)
-    public string NewsApiKey { get; set; } = ""; // Chiave API NewsAPI
-    public string NewsCountry { get; set; } = "it"; // Paese per le notizie (codice ISO)
-    public int NewsUpdateIntervalMs { get; set; } = 300000; // Intervallo aggiornamento notizie (5 minuti)
+    // RSS News (Ansa.it)
+    public int NewsRssUpdateIntervalMs { get; set; } = 3600000; // Intervallo aggiornamento RSS (1 ora)
 
     // API Meteo (OpenWeatherMap)
     public string WeatherApiKey { get; set; } = ""; // Chiave API OpenWeatherMap
