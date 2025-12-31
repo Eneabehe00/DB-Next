@@ -79,6 +79,13 @@ public class ConfigForm : Form
     private NumericUpDown _numInfoBarFontSize = null!;
     private Panel _pnlInfoBarTextColor = null!;
     private NumericUpDown _numNewsRssUpdateInterval = null!;
+    private NumericUpDown _numRssNewsPerCategory = null!;
+    private CheckBox _chkRssUltimaOra = null!;
+    private CheckBox _chkRssCronaca = null!;
+    private CheckBox _chkRssPolitica = null!;
+    private CheckBox _chkRssMondo = null!;
+    private CheckBox _chkRssEconomia = null!;
+    private CheckBox _chkRssSport = null!;
     private TextBox _txtWeatherApiKey = null!;
     private TextBox _txtWeatherCity = null!;
     private ComboBox _cmbWeatherUnits = null!;
@@ -301,16 +308,41 @@ public class ConfigForm : Form
 
         // === Sezione RSS Notizie ===
         var grpNewsRss = CreateGroupBox("RSS Notizie (Ansa.it)");
-        var newsRssLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, AutoSize = true };
+        var newsRssLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 4, AutoSize = true };
 
-        // Riga 0: Info RSS
-        newsRssLayout.Controls.Add(new Label { Text = "Feed RSS automatici da Ansa.it (6 categorie)", AutoSize = true }, 0, 0);
+        // Riga 0: Info RSS e numero notizie per categoria
+        newsRssLayout.Controls.Add(new Label { Text = "Feed RSS automatici da Ansa.it", AutoSize = true }, 0, 0);
         newsRssLayout.SetColumnSpan(newsRssLayout.Controls[0], 2);
+
+        newsRssLayout.Controls.Add(new Label { Text = "Notizie per categoria:", AutoSize = true }, 2, 0);
+        _numRssNewsPerCategory = new NumericUpDown { Minimum = 1, Maximum = 20, Value = 1, Width = 60 };
+        newsRssLayout.Controls.Add(_numRssNewsPerCategory, 3, 0);
 
         // Riga 1: Intervallo aggiornamento
         newsRssLayout.Controls.Add(new Label { Text = "Aggiornamento (ore):", AutoSize = true }, 0, 1);
         _numNewsRssUpdateInterval = new NumericUpDown { Minimum = 1, Maximum = 24, Value = 1, Width = 60 };
         newsRssLayout.Controls.Add(_numNewsRssUpdateInterval, 1, 1);
+
+        // Riga 2: Categorie abilitate (colonna sinistra)
+        newsRssLayout.Controls.Add(new Label { Text = "Categorie abilitate:", AutoSize = true }, 0, 2);
+        _chkRssUltimaOra = new CheckBox { Text = "Ultima Ora", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssUltimaOra, 1, 2);
+
+        _chkRssCronaca = new CheckBox { Text = "Cronaca", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssCronaca, 2, 2);
+
+        _chkRssPolitica = new CheckBox { Text = "Politica", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssPolitica, 3, 2);
+
+        // Riga 3: Categorie abilitate (colonna destra)
+        _chkRssMondo = new CheckBox { Text = "Mondo", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssMondo, 1, 3);
+
+        _chkRssEconomia = new CheckBox { Text = "Economia", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssEconomia, 2, 3);
+
+        _chkRssSport = new CheckBox { Text = "Sport", AutoSize = true, ForeColor = Color.White, Checked = true };
+        newsRssLayout.Controls.Add(_chkRssSport, 3, 3);
 
         grpNewsRss.Controls.Add(newsRssLayout);
         infoBarLayout.Controls.Add(grpNewsRss);
@@ -327,7 +359,7 @@ public class ConfigForm : Form
 
         // Riga 1: Città e unità
         weatherApiLayout.Controls.Add(new Label { Text = "Città:", AutoSize = true }, 0, 1);
-        _txtWeatherCity = new TextBox { Width = 100, Text = "Rome" };
+        _txtWeatherCity = new TextBox { Width = 100, Text = "Rome,IT", PlaceholderText = "Città,CC (es: Rome,IT)" };
         weatherApiLayout.Controls.Add(_txtWeatherCity, 1, 1);
 
         weatherApiLayout.Controls.Add(new Label { Text = "Unità:", AutoSize = true }, 2, 1);
@@ -1235,9 +1267,16 @@ public class ConfigForm : Form
             _numInfoBarFontSize.Value = Math.Max(8, Math.Min(24, _settings.InfoBarFontSize));
             _pnlInfoBarTextColor.BackColor = ColorFromHex(_settings.InfoBarTextColor);
             _numNewsRssUpdateInterval.Value = Math.Max(1, Math.Min(24, _settings.NewsRssUpdateIntervalMs / 3600000)); // ore
-            Logger.Info($"Caricate impostazioni RSS - Intervallo: {_settings.NewsRssUpdateIntervalMs}ms ({_settings.NewsRssUpdateIntervalMs / 3600000}h)");
+            _numRssNewsPerCategory.Value = Config.RssNewsPerCategory;
+            _chkRssUltimaOra.Checked = Config.RssUltimaOraEnabled;
+            _chkRssCronaca.Checked = Config.RssCronacaEnabled;
+            _chkRssPolitica.Checked = Config.RssPoliticaEnabled;
+            _chkRssMondo.Checked = Config.RssMondoEnabled;
+            _chkRssEconomia.Checked = Config.RssEconomiaEnabled;
+            _chkRssSport.Checked = Config.RssSportEnabled;
+            Logger.Info($"Caricate impostazioni RSS - Intervallo: {_settings.NewsRssUpdateIntervalMs}ms ({_settings.NewsRssUpdateIntervalMs / 3600000}h), Notizie per categoria: {Config.RssNewsPerCategory}");
             _txtWeatherApiKey.Text = _settings.WeatherApiKey;
-            _txtWeatherCity.Text = _settings.WeatherCity ?? "Rome";
+            _txtWeatherCity.Text = _settings.WeatherCity ?? "Rome,IT";
             _cmbWeatherUnits.SelectedItem = _settings.WeatherUnits ?? "metric";
             _numWeatherUpdateInterval.Value = Math.Max(5, Math.Min(120, _settings.WeatherUpdateIntervalMs / 60000));
 
@@ -1448,6 +1487,15 @@ public class ConfigForm : Form
             _settings.InfoBarFontSize = (int)_numInfoBarFontSize.Value;
             _settings.InfoBarTextColor = ColorToHex(_pnlInfoBarTextColor.BackColor);
             _settings.NewsRssUpdateIntervalMs = (int)_numNewsRssUpdateInterval.Value * 3600000; // ore a ms
+            Config.SetRssSettings(
+                (int)_numRssNewsPerCategory.Value,
+                _chkRssUltimaOra.Checked,
+                _chkRssCronaca.Checked,
+                _chkRssPolitica.Checked,
+                _chkRssMondo.Checked,
+                _chkRssEconomia.Checked,
+                _chkRssSport.Checked
+            );
             _settings.WeatherApiKey = _txtWeatherApiKey.Text;
             _settings.WeatherCity = _txtWeatherCity.Text;
             _settings.WeatherUnits = _cmbWeatherUnits.SelectedItem?.ToString() ?? "metric";
@@ -1456,7 +1504,7 @@ public class ConfigForm : Form
             Logger.Info($"Salvando impostazioni RSS - Intervallo: {_settings.NewsRssUpdateIntervalMs}ms ({_settings.NewsRssUpdateIntervalMs / 3600000}h)");
             await Database.SaveSettingsAsync(_settings);
 
-            // Salva configurazione database
+            // Salva configurazione database e RSS
             Config.SetConnectionParameters(_txtDbServer.Text, (int)_numDbPort.Value, _txtDbName.Text, _txtDbUser.Text, _txtDbPassword.Text);
             var exePath = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
             if (Config.SaveToFile(exePath))
@@ -1719,7 +1767,8 @@ public class ConfigForm : Form
             using var httpClient = new System.Net.Http.HttpClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DB-Next-Config/1.0");
 
-            var url = $"https://api.openweathermap.org/data/2.5/weather?q={_txtWeatherCity.Text}&units={_cmbWeatherUnits.Text}&appid={_txtWeatherApiKey.Text}&lang=it";
+            var encodedCity = Uri.EscapeDataString(_txtWeatherCity.Text);
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={encodedCity}&units={_cmbWeatherUnits.Text}&appid={_txtWeatherApiKey.Text}&lang=it";
             var response = await httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)

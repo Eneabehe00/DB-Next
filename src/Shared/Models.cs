@@ -98,7 +98,7 @@ public class QueueSettings
 
     // API Meteo (OpenWeatherMap)
     public string WeatherApiKey { get; set; } = ""; // Chiave API OpenWeatherMap
-    public string WeatherCity { get; set; } = "Rome"; // Città per il meteo
+    public string WeatherCity { get; set; } = "Rome,IT"; // Città per il meteo (formato: Città,CC)
     public string WeatherUnits { get; set; } = "metric"; // Unità di misura (metric, imperial)
     public int WeatherUpdateIntervalMs { get; set; } = 600000; // Intervallo aggiornamento meteo (10 minuti)
 

@@ -18,6 +18,18 @@ user=user
 # Password MySQL
 password=dibal
 
+# RSS News Settings
+# Numero di notizie da prendere per ogni categoria RSS (default: 1)
+rss_news_per_category=1
+
+# Abilita/disabilita categorie RSS (true/false)
+rss_ultima_ora_enabled=true
+rss_cronaca_enabled=true
+rss_politica_enabled=true
+rss_mondo_enabled=true
+rss_economia_enabled=true
+rss_sport_enabled=true
+
 # NOTE:
 # - Il database sys_datos esiste già nella bilancia
 # - Esegui sql/install.sql per installare/aggiornare le tabelle

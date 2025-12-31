@@ -1328,16 +1328,19 @@ public class MainForm : Form
         {
             Logger.Info("Inizio caricamento RSS Ansa.it");
 
-            // Definizione categorie RSS Ansa.it con URL
-            var rssFeeds = new[]
+            // Definizione categorie RSS Ansa.it con URL (filtrate per quelle abilitate)
+            var allRssFeeds = new[]
             {
-                new { Category = "Ultima Ora", Url = "https://www.ansa.it/sito/ansait/rss.xml" },
-                new { Category = "Cronaca", Url = "https://www.ansa.it/sito/notizie/cronaca/cronaca_rss.xml" },
-                new { Category = "Politica", Url = "https://www.ansa.it/sito/notizie/politica/politica_rss.xml" },
-                new { Category = "Mondo", Url = "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml" },
-                new { Category = "Economia", Url = "https://www.ansa.it/sito/notizie/economia/economia_rss.xml" },
-                new { Category = "Sport", Url = "https://www.ansa.it/sito/notizie/sport/sport_rss.xml" }
+                new { Category = "Ultima Ora", Url = "https://www.ansa.it/sito/ansait/rss.xml", Enabled = DBNext.Shared.Config.RssUltimaOraEnabled },
+                new { Category = "Cronaca", Url = "https://www.ansa.it/sito/notizie/cronaca/cronaca_rss.xml", Enabled = DBNext.Shared.Config.RssCronacaEnabled },
+                new { Category = "Politica", Url = "https://www.ansa.it/sito/notizie/politica/politica_rss.xml", Enabled = DBNext.Shared.Config.RssPoliticaEnabled },
+                new { Category = "Mondo", Url = "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml", Enabled = DBNext.Shared.Config.RssMondoEnabled },
+                new { Category = "Economia", Url = "https://www.ansa.it/sito/notizie/economia/economia_rss.xml", Enabled = DBNext.Shared.Config.RssEconomiaEnabled },
+                new { Category = "Sport", Url = "https://www.ansa.it/sito/notizie/sport/sport_rss.xml", Enabled = DBNext.Shared.Config.RssSportEnabled }
             };
+
+            // Filtra solo i feed abilitati
+            var rssFeeds = allRssFeeds.Where(f => f.Enabled).ToArray();
 
             var allNews = new List<(string Category, string Title, string Description, DateTime PubDate)>();
 
@@ -1358,13 +1361,13 @@ public class MainForm : Form
                     var xmlContent = await response.Content.ReadAsStringAsync();
                     var rssDoc = XDocument.Parse(xmlContent);
 
-                    // Estrai il primo item (notizia più recente) da ogni categoria
-                    var firstItem = rssDoc.Descendants("item").FirstOrDefault();
-                    if (firstItem != null)
+                    // Estrai i primi N items (notizie più recenti) da ogni categoria
+                    var items = rssDoc.Descendants("item").Take(DBNext.Shared.Config.RssNewsPerCategory);
+                    foreach (var item in items)
                     {
-                        var title = firstItem.Element("title")?.Value ?? "";
-                        var description = firstItem.Element("description")?.Value ?? "";
-                        var pubDateStr = firstItem.Element("pubDate")?.Value ?? "";
+                        var title = item.Element("title")?.Value ?? "";
+                        var description = item.Element("description")?.Value ?? "";
+                        var pubDateStr = item.Element("pubDate")?.Value ?? "";
 
                         // Parse data pubblicazione
                         DateTime pubDate = DateTime.MinValue;
@@ -1429,7 +1432,7 @@ public class MainForm : Form
             }
             else
             {
-                Logger.Info($"RSS Ansa.it: caricate {_newsHeadlines.Count} notizie da {rssFeeds.Length} categorie");
+                Logger.Info($"RSS Ansa.it: caricate {_newsHeadlines.Count} notizie da {rssFeeds.Length} categorie (max {DBNext.Shared.Config.RssNewsPerCategory} per categoria)");
             }
 
             _currentNewsIndex = 0;
@@ -1456,8 +1459,9 @@ public class MainForm : Form
             if (string.IsNullOrEmpty(_settings.WeatherApiKey))
                 return;
 
-            var url = $"https://api.openweathermap.org/data/2.5/weather?q={_settings.WeatherCity}&units={_settings.WeatherUnits}&appid={_settings.WeatherApiKey}&lang=it";
-            Logger.Info($"Richiesta OpenWeatherMap: città={_settings.WeatherCity}, unità={_settings.WeatherUnits}");
+            var encodedCity = Uri.EscapeDataString(_settings.WeatherCity);
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={encodedCity}&units={_settings.WeatherUnits}&appid={_settings.WeatherApiKey}&lang=it";
+            Logger.Info($"Richiesta OpenWeatherMap: città={_settings.WeatherCity} (encoded: {encodedCity}), unità={_settings.WeatherUnits}");
 
             var response = await _httpClient.GetAsync(url);
             Logger.Info($"OpenWeatherMap response status: {response.StatusCode}");
