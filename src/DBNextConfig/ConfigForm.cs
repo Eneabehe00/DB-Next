@@ -114,6 +114,20 @@ public class ConfigForm : Form
     {
         InitializeComponent();
         this.Load += ConfigForm_Load;
+
+        // Imposta l'icona dell'applicazione
+        try
+        {
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "DBNext.ico");
+            if (File.Exists(iconPath))
+            {
+                this.Icon = new Icon(iconPath);
+            }
+        }
+        catch
+        {
+            // Logger non disponibile qui, ignoriamo l'errore silenziosamente
+        }
     }
     
     private void InitializeComponent()

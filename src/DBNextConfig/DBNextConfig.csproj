@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>DB-NextConfig</AssemblyName>
     <RootNamespace>DBNextConfig</RootNamespace>
+    <ApplicationIcon>..\Resources\DBNext.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

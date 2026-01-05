@@ -72,6 +72,20 @@ public class MainForm : Form
         this.StartPosition = FormStartPosition.Manual;
         this.KeyPreview = true;
         this.DoubleBuffered = true;
+
+        // Imposta l'icona dell'applicazione
+        try
+        {
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "DBNext.ico");
+            if (File.Exists(iconPath))
+            {
+                this.Icon = new Icon(iconPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Impossibile caricare l'icona: {ex.Message}");
+        }
         
         // Imposta dimensioni e posizione esatte dello schermo
         this.Bounds = targetScreen.Bounds;

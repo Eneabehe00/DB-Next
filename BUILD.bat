@@ -45,6 +45,7 @@ xcopy /Y publish\*.exe Deployment\ >nul
 xcopy /Y publish\*.dll Deployment\ >nul
 xcopy /Y publish\*.pdb Deployment\ >nul
 xcopy /Y publish\*.json Deployment\ >nul
+if exist src\Resources xcopy /Y /E src\Resources Deployment\ >nul
 echo       OK - Deploy completato
 echo.
 

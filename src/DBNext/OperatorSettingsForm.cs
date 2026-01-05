@@ -42,6 +42,20 @@ public class OperatorSettingsForm : Form
     {
         InitializeComponent();
         this.Load += OperatorSettingsForm_Load;
+
+        // Imposta l'icona dell'applicazione
+        try
+        {
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "DBNext.ico");
+            if (File.Exists(iconPath))
+            {
+                this.Icon = new Icon(iconPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Impossibile caricare l'icona: {ex.Message}");
+        }
     }
 
     private void InitializeComponent()
