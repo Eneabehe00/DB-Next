@@ -252,14 +252,34 @@ public class MainForm : Form
             // Inizializza cache solo se siamo slave
             if (IsSlave())
             {
-                _mediaCache = new MediaCache(_settings.MediaPath ?? "");
+                // Per le slave, trasforma il percorso media con l'indirizzo del master
+                var slaveMediaPath = TransformMediaPathForSlave(_settings.MediaPath ?? "");
+                _mediaCache = new MediaCache(slaveMediaPath);
 
-                // Pulizia periodica ogni 24 ore
-                _cacheCleanupTimer = new System.Timers.Timer(24 * 60 * 60 * 1000); // 24 ore
-                _cacheCleanupTimer.Elapsed += (s, e) => _mediaCache.CleanupOldFiles();
-                _cacheCleanupTimer.Start();
+                // Verifica connettività alla cartella condivisa
+                if (_mediaCache.IsRemotePathAccessible())
+                {
+                    Logger.Info($"Cartella remota accessibile: {slaveMediaPath}");
 
-                Logger.Info("Cache automatica inizializzata per slave");
+                    // Mostra stato iniziale della cache
+                    _mediaCache.LogCacheStatus();
+
+                    // Pulizia periodica ogni 24 ore
+                    _cacheCleanupTimer = new System.Timers.Timer(24 * 60 * 60 * 1000); // 24 ore
+                    _cacheCleanupTimer.Elapsed += (s, e) =>
+                    {
+                        _mediaCache.CleanupOldFiles();
+                        _mediaCache.SyncWithRemote();
+                    };
+                    _cacheCleanupTimer.Start();
+
+                    Logger.Info("Cache automatica inizializzata per slave");
+                }
+                else
+                {
+                    Logger.Warn($"Cartella remota NON accessibile: {slaveMediaPath}. Cache disabilitata.");
+                    _mediaCache = null; // Disabilita cache se percorso remoto non accessibile
+                }
             }
         }
         catch (Exception ex)
@@ -272,6 +292,53 @@ public class MainForm : Form
     {
         // Sei slave se il server configurato non è localhost
         return Config.Server != "localhost" && Config.Server != "127.0.0.1";
+    }
+
+    /// <summary>
+    /// Restituisce l'indirizzo del server master (per slave)
+    /// </summary>
+    private string GetMasterAddress()
+    {
+        return Config.Server;
+    }
+
+    /// <summary>
+    /// Trasforma il percorso media per le slave, sostituendo l'indirizzo nel percorso UNC
+    /// Es: \\CS1200-1\Pubblicità diventa \\192.168.1.100\Pubblicità
+    /// </summary>
+    private string TransformMediaPathForSlave(string mediaPath)
+    {
+        if (!IsSlave() || string.IsNullOrEmpty(mediaPath))
+            return mediaPath;
+
+        try
+        {
+            // Controlla se è un percorso UNC (inizia con \\)
+            if (mediaPath.StartsWith("\\\\"))
+            {
+                // Estrai il nome del server dal percorso UNC (prima parte dopo \\)
+                var firstBackslash = mediaPath.IndexOf('\\', 2);
+                if (firstBackslash > 2)
+                {
+                    var oldServerName = mediaPath.Substring(2, firstBackslash - 2);
+                    var remainingPath = mediaPath.Substring(firstBackslash);
+
+                    // Sostituisci con l'indirizzo del master
+                    var masterAddress = GetMasterAddress();
+                    var transformedPath = $"\\\\{masterAddress}{remainingPath}";
+
+                    Logger.Info($"Percorso media trasformato per slave: {mediaPath} -> {transformedPath}");
+                    return transformedPath;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Errore trasformazione percorso media: {ex.Message}");
+        }
+
+        // Se non è un percorso UNC o errore, restituisci il percorso originale
+        return mediaPath;
     }
 
     private string GetCachedSlideshowPath()
@@ -565,7 +632,7 @@ public class MainForm : Form
 
                     Logger.Info($"Nuovo intervallo RSS: {oldNewsInterval}ms -> {_settings.NewsRssUpdateIntervalMs}ms");
 
-                    this.Invoke(async () =>
+                    _ = this.Invoke(async () =>
                     {
                         // Se il margine superiore è cambiato, ricalcola i bounds
                         if (oldMarginTop != _settings.WindowMarginTop)
@@ -909,23 +976,40 @@ public class MainForm : Form
             }
 
             // === LOGICA CACHE AUTOMATICA ===
-            string mediaPathToUse = activeMediaPath;
+            // Per le slave, trasforma il percorso media con l'indirizzo del master
+            string mediaPathToUse = IsSlave() ? TransformMediaPathForSlave(activeMediaPath) : activeMediaPath;
             if (IsSlave() && _mediaCache != null)
             {
                 try
                 {
-                    // Per slideshow/cartelle
-                    if (activeMediaFolderMode && Directory.Exists(activeMediaPath))
+                    // Per slideshow/cartelle - usa il percorso trasformato per i controlli
+                    if (activeMediaFolderMode && Directory.Exists(mediaPathToUse))
                     {
-                        // Cache di tutta la cartella slideshow
-                        await _mediaCache.CacheSlideshowFolderAsync(activeMediaPath);
+                        Logger.Info($"Cache slideshow: cartella remota {mediaPathToUse} accessibile");
+                        // Cache di tutta la cartella slideshow usando il percorso trasformato
+                        await _mediaCache.CacheSlideshowFolderAsync(mediaPathToUse);
                         mediaPathToUse = GetCachedSlideshowPath();
+                        Logger.Info($"Cache slideshow: uso cartella cache locale {mediaPathToUse}");
+
+                        // Sincronizza cache con cartella remota (elimina file orfani)
+                        _mediaCache.SyncWithRemote();
+
+                        // Mostra stato cache dopo il download
+                        _mediaCache.LogCacheStatus();
                     }
                     else
                     {
                         // Cache singolo file
                         string filename = Path.GetFileName(activeMediaPath);
-                        mediaPathToUse = await _mediaCache.GetMediaPathAsync(filename);
+                        if (!string.IsNullOrEmpty(filename))
+                        {
+                            Logger.Info($"Cache singolo file: {filename} da {mediaPathToUse}");
+                            mediaPathToUse = await _mediaCache.GetMediaPathAsync(filename);
+                        }
+                        else
+                        {
+                            Logger.Warn("Cache: filename vuoto, skip caching singolo file");
+                        }
                     }
 
                     Logger.Info($"Uso percorso cache: {mediaPathToUse}");
@@ -934,6 +1018,7 @@ public class MainForm : Form
                 {
                     Logger.Warn($"Cache fallita, uso percorso remoto: {ex.Message}");
                     // Continua con mediaPathToUse = activeMediaPath (remoto)
+                    mediaPathToUse = activeMediaPath;
                 }
             }
 

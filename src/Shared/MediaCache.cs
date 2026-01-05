@@ -24,6 +24,21 @@ public class MediaCache
     }
 
     /// <summary>
+    /// Verifica se la cartella remota è accessibile
+    /// </summary>
+    public bool IsRemotePathAccessible()
+    {
+        try
+        {
+            return Directory.Exists(_remotePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Restituisce il percorso locale del file, scaricandolo se necessario
     /// </summary>
     public async Task<string> GetMediaPathAsync(string filename)
@@ -87,8 +102,31 @@ public class MediaCache
     /// </summary>
     private async Task DownloadFileAsync(string sourcePath, string destPath)
     {
-        // Copia dalla cartella condivisa (UNC path)
-        await Task.Run(() => File.Copy(sourcePath, destPath, true));
+        try
+        {
+            // Verifica che il percorso remoto sia accessibile
+            if (!File.Exists(sourcePath))
+            {
+                throw new FileNotFoundException($"File remoto non trovato: {sourcePath}");
+            }
+
+            // Copia dalla cartella condivisa (UNC path)
+            await Task.Run(() => File.Copy(sourcePath, destPath, true));
+            Logger.Info($"Download completato: {sourcePath} -> {destPath}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            throw new Exception($"Accesso negato al percorso remoto. Verifica permessi di rete: {sourcePath}", ex);
+        }
+        catch (IOException ex) when (ex.Message.Contains("network"))
+        {
+            throw new Exception($"Errore di rete nell'accesso al percorso remoto: {sourcePath}", ex);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Errore download {sourcePath}: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -117,32 +155,178 @@ public class MediaCache
     }
 
     /// <summary>
+    /// Sincronizza la cache locale con la cartella remota, eliminando file che non esistono più
+    /// </summary>
+    public void SyncWithRemote()
+    {
+        try
+        {
+            Logger.Info("SyncWithRemote: Inizio sincronizzazione cache con cartella remota");
+
+            if (!Directory.Exists(_remotePath))
+            {
+                Logger.Warn($"SyncWithRemote: Cartella remota non accessibile: {_remotePath}");
+                return;
+            }
+
+            // Ottieni lista file remoti supportati
+            var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
+            var videoExtensions = new[] { ".mp4", ".avi", ".wmv", ".webm", ".mkv", ".mov" };
+            var allExtensions = imageExtensions.Concat(videoExtensions).ToArray();
+
+            var remoteFiles = Directory.GetFiles(_remotePath)
+                .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLower()))
+                .Select(f => Path.GetFileName(f))
+                .ToHashSet();
+
+            Logger.Info($"SyncWithRemote: {remoteFiles.Count} file presenti nella cartella remota");
+
+            // Ottieni lista file locali nella cache
+            if (!Directory.Exists(_cachePath))
+            {
+                Logger.Info("SyncWithRemote: Nessuna cache locale presente");
+                return;
+            }
+
+            var cacheFiles = Directory.GetFiles(_cachePath)
+                .Select(f => Path.GetFileName(f))
+                .ToList();
+
+            Logger.Info($"SyncWithRemote: {cacheFiles.Count} file presenti nella cache locale");
+
+            // Elimina dalla cache i file che non esistono più nella cartella remota
+            int deletedCount = 0;
+            foreach (var cacheFile in cacheFiles)
+            {
+                if (!remoteFiles.Contains(cacheFile))
+                {
+                    string fullPath = Path.Combine(_cachePath, cacheFile);
+                    try
+                    {
+                        File.Delete(fullPath);
+                        Logger.Info($"SyncWithRemote: Eliminato dalla cache {cacheFile} (non più presente nella cartella remota)");
+                        deletedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"SyncWithRemote: Errore eliminazione {cacheFile}: {ex.Message}");
+                    }
+                }
+            }
+
+            Logger.Info($"SyncWithRemote: Sincronizzazione completata - eliminati {deletedCount} file orfani");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"SyncWithRemote: Errore durante sincronizzazione: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Mostra lo stato attuale della cache per debug
+    /// </summary>
+    public void LogCacheStatus()
+    {
+        try
+        {
+            Logger.Info("=== STATO CACHE ===");
+            Logger.Info($"Percorso remoto configurato: {_remotePath}");
+            Logger.Info($"Percorso cache locale: {_cachePath}");
+            Logger.Info($"Cartella remota accessibile: {IsRemotePathAccessible()}");
+
+            if (Directory.Exists(_cachePath))
+            {
+                var cacheDir = new DirectoryInfo(_cachePath);
+                var files = cacheDir.GetFiles();
+
+                Logger.Info($"File presenti in cache: {files.Length}");
+
+                if (files.Length > 0)
+                {
+                    Logger.Info("Ultimi 5 file in cache:");
+                    foreach (var file in files.OrderByDescending(f => f.LastWriteTime).Take(5))
+                    {
+                        Logger.Info($"  {file.Name} ({file.Length} bytes, {file.LastWriteTime})");
+                    }
+                }
+                else
+                {
+                    Logger.Info("Nessun file presente in cache");
+                }
+            }
+            else
+            {
+                Logger.Info("Cartella cache locale non esiste ancora");
+            }
+
+            Logger.Info("===================");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Errore controllo stato cache: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Scarica tutti i file di una cartella slideshow
     /// </summary>
     public async Task CacheSlideshowFolderAsync(string remoteFolderPath)
     {
         try
         {
+            Logger.Info($"CacheSlideshowFolderAsync: Inizio caching cartella {remoteFolderPath}");
+
+            // Verifica che la cartella esista
+            if (!Directory.Exists(remoteFolderPath))
+            {
+                Logger.Warn($"CacheSlideshowFolderAsync: Cartella remota non esiste: {remoteFolderPath}");
+                return;
+            }
+
             var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
             var videoExtensions = new[] { ".mp4", ".avi", ".wmv", ".webm", ".mkv", ".mov" };
             var allExtensions = imageExtensions.Concat(videoExtensions).ToArray();
 
-            var remoteFiles = Directory.GetFiles(remoteFolderPath)
+            // Prima elenca tutti i file nella cartella
+            var allFiles = Directory.GetFiles(remoteFolderPath);
+            Logger.Info($"CacheSlideshowFolderAsync: Trovati {allFiles.Length} file totali in {remoteFolderPath}");
+
+            // Poi filtra per estensioni supportate
+            var remoteFiles = allFiles
                 .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLower()))
                 .ToArray();
 
+            Logger.Info($"CacheSlideshowFolderAsync: {remoteFiles.Length} file media supportati trovati");
+
+            if (remoteFiles.Length == 0)
+            {
+                Logger.Warn($"CacheSlideshowFolderAsync: Nessun file media trovato nella cartella {remoteFolderPath}");
+                Logger.Warn($"CacheSlideshowFolderAsync: Estensioni supportate: {string.Join(", ", allExtensions)}");
+                return;
+            }
+
             // Cache tutti i file dello slideshow
+            int successCount = 0;
             foreach (var remoteFile in remoteFiles)
             {
                 string filename = Path.GetFileName(remoteFile);
-                await GetMediaPathAsync(filename);
+                try
+                {
+                    Logger.Info($"CacheSlideshowFolderAsync: Caching {filename}...");
+                    await GetMediaPathAsync(filename);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"CacheSlideshowFolderAsync: Errore caching {filename}: {ex.Message}");
+                }
             }
 
-            Logger.Info($"Slideshow cache: {remoteFiles.Length} file");
+            Logger.Info($"CacheSlideshowFolderAsync: Completato - {successCount}/{remoteFiles.Length} file cachati");
         }
         catch (Exception ex)
         {
-            Logger.Warn($"Errore cache slideshow: {ex.Message}");
+            Logger.Error($"CacheSlideshowFolderAsync: Errore generale: {ex.Message}");
         }
     }
 }
