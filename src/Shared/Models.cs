@@ -64,7 +64,7 @@ public class QueueSettings
     public int OperatorWindowX { get; set; } = 50; // Posizione X della finestra operatore
     public int OperatorWindowY { get; set; } = 50; // Posizione Y della finestra operatore
     public int OperatorWindowWidth { get; set; } = 200; // Larghezza finestra operatore
-    public int OperatorWindowHeight { get; set; } = 80; // Altezza finestra operatore
+    public int OperatorWindowHeight { get; set; } = 25; // Altezza finestra operatore
     public int OperatorMonitorIndex { get; set; } = 0; // Indice monitor per finestra operatore
     public string OperatorBgColor { get; set; } = "#000000"; // Sfondo finestra operatore
     public string OperatorTextColor { get; set; } = "#FFFFFF"; // Colore testo finestra operatore

@@ -58,6 +58,10 @@ public class MainForm : Form
     private int _currentNewsIndex = 0;
     private string _currentWeather = "";
     private HttpClient _httpClient;
+
+    // Cache automatica per slave
+    private MediaCache? _mediaCache;
+    private System.Timers.Timer? _cacheCleanupTimer;
     
     public MainForm(Screen targetScreen, QueueSettings? settings = null, int screenIndex = -1)
     {
@@ -236,8 +240,49 @@ public class MainForm : Form
         this.KeyDown += MainForm_KeyDown;
         this.FormClosing += MainForm_FormClosing;
         this.Resize += MainForm_Resize;
+
+        // Inizializza cache automatica per slave
+        InitializeMediaCache();
     }
-    
+
+    private void InitializeMediaCache()
+    {
+        try
+        {
+            // Inizializza cache solo se siamo slave
+            if (IsSlave())
+            {
+                _mediaCache = new MediaCache(_settings.MediaPath ?? "");
+
+                // Pulizia periodica ogni 24 ore
+                _cacheCleanupTimer = new System.Timers.Timer(24 * 60 * 60 * 1000); // 24 ore
+                _cacheCleanupTimer.Elapsed += (s, e) => _mediaCache.CleanupOldFiles();
+                _cacheCleanupTimer.Start();
+
+                Logger.Info("Cache automatica inizializzata per slave");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Errore inizializzazione cache: {ex.Message}");
+        }
+    }
+
+    private bool IsSlave()
+    {
+        // Sei slave se il server configurato non è localhost
+        return Config.Server != "localhost" && Config.Server != "127.0.0.1";
+    }
+
+    private string GetCachedSlideshowPath()
+    {
+        // Restituisce il percorso della cartella cache
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DBNext", "MediaCache"
+        );
+    }
+
     private void MediaPlayer_EndReached(object? sender, EventArgs e)
     {
         // Quando il video finisce durante lo slideshow, passa alla slide successiva
@@ -296,7 +341,7 @@ public class MainForm : Form
             Application.DoEvents();
 
             UpdateLayout();
-            LoadMedia();
+            await LoadMedia();
             UpdateOperatorWindow();
             }
             catch (Exception ex)
@@ -520,7 +565,7 @@ public class MainForm : Form
 
                     Logger.Info($"Nuovo intervallo RSS: {oldNewsInterval}ms -> {_settings.NewsRssUpdateIntervalMs}ms");
 
-                    this.Invoke(() =>
+                    this.Invoke(async () =>
                     {
                         // Se il margine superiore è cambiato, ricalcola i bounds
                         if (oldMarginTop != _settings.WindowMarginTop)
@@ -529,7 +574,7 @@ public class MainForm : Form
                         }
                         ApplyNumberStyle();
                         UpdateLayout();
-                        LoadMedia();
+                        await LoadMedia();
                         UpdateOperatorWindow();
 
                         // Se è cambiato l'intervallo RSS o lo stato della barra informativa, aggiorna la barra
@@ -809,7 +854,7 @@ public class MainForm : Form
         }
     }
     
-    private void LoadMedia()
+    private async Task LoadMedia()
     {
         try
         {
@@ -863,11 +908,40 @@ public class MainForm : Form
                 Logger.Info($"LoadMedia: Uso impostazioni normali - Path: '{activeMediaPath}', Type: '{activeMediaType}'");
             }
 
-            Logger.Info($"LoadMedia: Caricamento media '{activeMediaPath}' tipo '{activeMediaType}'");
+            // === LOGICA CACHE AUTOMATICA ===
+            string mediaPathToUse = activeMediaPath;
+            if (IsSlave() && _mediaCache != null)
+            {
+                try
+                {
+                    // Per slideshow/cartelle
+                    if (activeMediaFolderMode && Directory.Exists(activeMediaPath))
+                    {
+                        // Cache di tutta la cartella slideshow
+                        await _mediaCache.CacheSlideshowFolderAsync(activeMediaPath);
+                        mediaPathToUse = GetCachedSlideshowPath();
+                    }
+                    else
+                    {
+                        // Cache singolo file
+                        string filename = Path.GetFileName(activeMediaPath);
+                        mediaPathToUse = await _mediaCache.GetMediaPathAsync(filename);
+                    }
+
+                    Logger.Info($"Uso percorso cache: {mediaPathToUse}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Cache fallita, uso percorso remoto: {ex.Message}");
+                    // Continua con mediaPathToUse = activeMediaPath (remoto)
+                }
+            }
+
+            Logger.Info($"LoadMedia: Caricamento media '{mediaPathToUse}' tipo '{activeMediaType}'");
             _pictureBox.Image?.Dispose();
             _pictureBox.Image = null;
 
-            if (string.IsNullOrEmpty(activeMediaPath))
+            if (string.IsNullOrEmpty(mediaPathToUse))
             {
                 _pictureBox.BackColor = Color.Black;
                 return;
@@ -879,14 +953,14 @@ public class MainForm : Form
                 : PictureBoxSizeMode.StretchImage;
 
             // Modalità cartella (slideshow)
-            if (activeMediaFolderMode && Directory.Exists(activeMediaPath))
+            if (activeMediaFolderMode && Directory.Exists(mediaPathToUse))
             {
-                LoadSlideshow(activeMediaPath, activeSlideshowIntervalMs);
+                LoadSlideshow(mediaPathToUse, activeSlideshowIntervalMs);
                 return;
             }
-            
+
             // File singolo
-            if (!File.Exists(activeMediaPath))
+            if (!File.Exists(mediaPathToUse))
             {
                 _pictureBox.BackColor = Color.Black;
                 return;
@@ -895,20 +969,20 @@ public class MainForm : Form
             // File singolo = non è slideshow
             _isPlayingVideoInSlideshow = false;
 
-            var ext = Path.GetExtension(activeMediaPath).ToLower();
+            var ext = Path.GetExtension(mediaPathToUse).ToLower();
 
             if (ext == ".gif" || activeMediaType == "gif")
             {
-                _pictureBox.Image = Image.FromFile(activeMediaPath);
+                _pictureBox.Image = Image.FromFile(mediaPathToUse);
             }
             else if (IsVideoFile(ext) || activeMediaType == "video")
             {
                 // Riproduci video con LibVLC (loop infinito per file singolo)
-                LoadVideo(activeMediaPath);
+                LoadVideo(mediaPathToUse);
             }
             else
             {
-                _pictureBox.Image = Image.FromFile(activeMediaPath);
+                _pictureBox.Image = Image.FromFile(mediaPathToUse);
             }
 
             Logger.Info($"Media caricato: {activeMediaPath}");

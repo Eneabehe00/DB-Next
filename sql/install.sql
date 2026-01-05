@@ -47,12 +47,12 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     poll_ms INT DEFAULT 1000 COMMENT 'Intervallo polling DB in millisecondi',
 
     -- Layout
-    layout_left_pct INT DEFAULT 75 COMMENT 'Percentuale larghezza sinistra (media)',
-    layout_right_pct INT DEFAULT 25 COMMENT 'Percentuale larghezza destra (numero)',
+    layout_left_pct INT DEFAULT 70 COMMENT 'Percentuale larghezza sinistra (media)',
+    layout_right_pct INT DEFAULT 30 COMMENT 'Percentuale larghezza destra (numero)',
 
     -- Display
     screen_mode VARCHAR(20) DEFAULT 'single' COMMENT 'Modalità: single, mirror, multi',
-    target_display_index INT DEFAULT 0 COMMENT 'Indice monitor per modalità single',
+    target_display_index INT DEFAULT 1 COMMENT 'Indice monitor per modalità single',
     multi_display_list VARCHAR(50) DEFAULT '0' COMMENT 'Lista monitor per modalità multi (es. 0,2)',
     mirror_exclude_displays VARCHAR(50) DEFAULT '0' COMMENT 'Monitor da escludere in modalità mirror (es. 0)',
     mirror_info_bar_displays VARCHAR(50) DEFAULT '' COMMENT 'Monitor che mostrano la barra info in modalità mirror (es. 1,2, vuoto=tutti)',
@@ -60,37 +60,37 @@ CREATE TABLE IF NOT EXISTS queue_settings (
     window_mode VARCHAR(20) DEFAULT 'borderless' COMMENT 'Finestra: fullscreen, borderless, windowed',
     window_width INT DEFAULT 0 COMMENT 'Larghezza finestra personalizzata in pixel (0=auto)',
     window_height INT DEFAULT 0 COMMENT 'Altezza finestra personalizzata in pixel (0=auto)',
-    window_margin_top INT DEFAULT 0 COMMENT 'Margine superiore in pixel (per banner/overlay)',
+    window_margin_top INT DEFAULT 130 COMMENT 'Margine superiore in pixel (per banner/overlay)',
 
     -- Personalizzazione Numero
     number_font_family VARCHAR(100) DEFAULT 'Arial Black' COMMENT 'Font del numero',
-    number_font_size INT DEFAULT 0 COMMENT 'Dimensione font (0=auto)',
+    number_font_size INT DEFAULT 110 COMMENT 'Dimensione font (0=auto)',
     number_font_bold TINYINT(1) DEFAULT 1 COMMENT 'Grassetto',
-    number_color VARCHAR(20) DEFAULT '#FFC832' COMMENT 'Colore numero',
-    number_bg_color VARCHAR(20) DEFAULT '#14141E' COMMENT 'Colore sfondo',
+    number_color VARCHAR(20) DEFAULT '#FFFFFF' COMMENT 'Colore numero',
+    number_bg_color VARCHAR(20) DEFAULT '#000000' COMMENT 'Colore sfondo',
 
     -- Scritta sopra/sotto il numero
-    number_label_text VARCHAR(200) DEFAULT '' COMMENT 'Testo etichetta (es. Ora serviamo il numero)',
+    number_label_text VARCHAR(200) DEFAULT 'SERVIAMO IL NUMERO' COMMENT 'Testo etichetta (es. Ora serviamo il numero)',
     number_label_color VARCHAR(20) DEFAULT '#FFFFFF' COMMENT 'Colore etichetta',
-    number_label_size INT DEFAULT 0 COMMENT 'Dimensione font etichetta (0=auto responsive)',
+    number_label_size INT DEFAULT 20 COMMENT 'Dimensione font etichetta (0=auto responsive)',
     number_label_position VARCHAR(20) DEFAULT 'top' COMMENT 'Posizione: top, bottom',
-    number_label_offset INT DEFAULT 0 COMMENT 'Offset in pixel dalla posizione',
+    number_label_offset INT DEFAULT 20 COMMENT 'Offset in pixel dalla posizione',
 
     -- Slideshow
     media_folder_mode TINYINT(1) DEFAULT 0 COMMENT 'Modalità cartella (slideshow)',
     slideshow_interval_ms INT DEFAULT 5000 COMMENT 'Intervallo slideshow in ms',
 
     -- Finestra Operatore
-    operator_window_enabled TINYINT(1) DEFAULT 0 COMMENT 'Abilita finestra operatore',
-    operator_window_x INT DEFAULT 50 COMMENT 'Posizione X finestra operatore',
-    operator_window_y INT DEFAULT 50 COMMENT 'Posizione Y finestra operatore',
-    operator_window_width INT DEFAULT 200 COMMENT 'Larghezza finestra operatore',
-    operator_window_height INT DEFAULT 80 COMMENT 'Altezza finestra operatore',
+    operator_window_enabled TINYINT(1) DEFAULT 1 COMMENT 'Abilita finestra operatore',
+    operator_window_x INT DEFAULT 2 COMMENT 'Posizione X finestra operatore',
+    operator_window_y INT DEFAULT 72 COMMENT 'Posizione Y finestra operatore',
+    operator_window_width INT DEFAULT 120 COMMENT 'Larghezza finestra operatore',
+    operator_window_height INT DEFAULT 25 COMMENT 'Altezza finestra operatore',
     operator_monitor_index INT DEFAULT 0 COMMENT 'Indice monitor per finestra operatore',
     operator_bg_color VARCHAR(20) DEFAULT '#000000' COMMENT 'Colore sfondo finestra operatore',
     operator_text_color VARCHAR(20) DEFAULT '#FFFFFF' COMMENT 'Colore testo finestra operatore',
     operator_font_family VARCHAR(100) DEFAULT 'Arial Black' COMMENT 'Font finestra operatore',
-    operator_font_size INT DEFAULT 36 COMMENT 'Dimensione font finestra operatore',
+    operator_font_size INT DEFAULT 12 COMMENT 'Dimensione font finestra operatore',
     operator_always_on_top TINYINT(1) DEFAULT 1 COMMENT 'Finestra operatore sempre in primo piano',
     operator_label_text VARCHAR(50) DEFAULT 'TURNO' COMMENT 'Testo etichetta finestra operatore',
 
@@ -154,7 +154,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_font_size'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_font_size INT DEFAULT 0;
+        ALTER TABLE queue_settings ADD COLUMN number_font_size INT DEFAULT 110;
     END IF;
 
     IF NOT EXISTS (
@@ -172,7 +172,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_color'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_color VARCHAR(20) DEFAULT '#FFC832';
+        ALTER TABLE queue_settings ADD COLUMN number_color VARCHAR(20) DEFAULT '#FFFFFF';
     END IF;
 
     IF NOT EXISTS (
@@ -181,7 +181,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_bg_color'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_bg_color VARCHAR(20) DEFAULT '#14141E';
+        ALTER TABLE queue_settings ADD COLUMN number_bg_color VARCHAR(20) DEFAULT '#000000';
     END IF;
 
     -- Colonne per slideshow
@@ -210,7 +210,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_label_text'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_label_text VARCHAR(200) DEFAULT '';
+        ALTER TABLE queue_settings ADD COLUMN number_label_text VARCHAR(200) DEFAULT 'SERVIAMO IL NUMERO';
     END IF;
 
     IF NOT EXISTS (
@@ -228,7 +228,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_label_size'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_label_size INT DEFAULT 0;
+        ALTER TABLE queue_settings ADD COLUMN number_label_size INT DEFAULT 20;
     END IF;
 
     IF NOT EXISTS (
@@ -246,7 +246,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'number_label_offset'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN number_label_offset INT DEFAULT 0;
+        ALTER TABLE queue_settings ADD COLUMN number_label_offset INT DEFAULT 20;
     END IF;
 
     -- Colonne per dimensioni finestra personalizzate
@@ -284,7 +284,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_window_enabled'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_window_enabled TINYINT(1) DEFAULT 0;
+        ALTER TABLE queue_settings ADD COLUMN operator_window_enabled TINYINT(1) DEFAULT 1;
     END IF;
 
     IF NOT EXISTS (
@@ -293,7 +293,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_window_x'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_window_x INT DEFAULT 50;
+        ALTER TABLE queue_settings ADD COLUMN operator_window_x INT DEFAULT 2;
     END IF;
 
     IF NOT EXISTS (
@@ -302,7 +302,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_window_y'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_window_y INT DEFAULT 50;
+        ALTER TABLE queue_settings ADD COLUMN operator_window_y INT DEFAULT 72;
     END IF;
 
     IF NOT EXISTS (
@@ -311,7 +311,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_window_width'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_window_width INT DEFAULT 200;
+        ALTER TABLE queue_settings ADD COLUMN operator_window_width INT DEFAULT 120;
     END IF;
 
     IF NOT EXISTS (
@@ -320,7 +320,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_window_height'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_window_height INT DEFAULT 80;
+        ALTER TABLE queue_settings ADD COLUMN operator_window_height INT DEFAULT 25;
     END IF;
 
     IF NOT EXISTS (
@@ -356,7 +356,7 @@ BEGIN
           AND TABLE_NAME = 'queue_settings'
           AND COLUMN_NAME = 'operator_font_size'
     ) THEN
-        ALTER TABLE queue_settings ADD COLUMN operator_font_size INT DEFAULT 36;
+        ALTER TABLE queue_settings ADD COLUMN operator_font_size INT DEFAULT 12;
     END IF;
 
     IF NOT EXISTS (

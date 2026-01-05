@@ -771,7 +771,7 @@ public class ConfigForm : Form
         positionLayout.Controls.Add(_numOperatorWidth, 1, 1);
 
         positionLayout.Controls.Add(new Label { Text = "Altezza:", AutoSize = true }, 2, 1);
-        _numOperatorHeight = new NumericUpDown { Minimum = 50, Maximum = 500, Value = 80, Width = 70 };
+        _numOperatorHeight = new NumericUpDown { Minimum = 20, Maximum = 500, Value = 25, Width = 70 };
         positionLayout.Controls.Add(_numOperatorHeight, 3, 1);
 
         // Riga 2: Monitor e sempre in primo piano
@@ -1261,7 +1261,7 @@ public class ConfigForm : Form
             _numOperatorX.Value = Math.Max(0, Math.Min(4000, _settings.OperatorWindowX));
             _numOperatorY.Value = Math.Max(0, Math.Min(4000, _settings.OperatorWindowY));
             _numOperatorWidth.Value = Math.Max(100, Math.Min(1000, _settings.OperatorWindowWidth));
-            _numOperatorHeight.Value = Math.Max(50, Math.Min(500, _settings.OperatorWindowHeight));
+            _numOperatorHeight.Value = Math.Max(20, Math.Min(500, _settings.OperatorWindowHeight));
             if (_settings.OperatorMonitorIndex < _cmbOperatorMonitor.Items.Count)
                 _cmbOperatorMonitor.SelectedIndex = _settings.OperatorMonitorIndex;
             _pnlOperatorBgColor.BackColor = ColorFromHex(_settings.OperatorBgColor);
