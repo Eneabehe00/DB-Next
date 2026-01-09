@@ -10,6 +10,8 @@ public class MediaCache
 {
     private readonly string _cachePath;
     private readonly string _remotePath;
+    private DateTime _lastSyncTime = DateTime.MinValue;
+    private readonly TimeSpan _minSyncInterval = TimeSpan.FromMinutes(5); // Sincronizza al massimo ogni 5 minuti
 
     public MediaCache(string remotePath)
     {
@@ -161,7 +163,7 @@ public class MediaCache
     {
         try
         {
-            Logger.Info("SyncWithRemote: Inizio sincronizzazione cache con cartella remota");
+            Logger.Info("SyncWithRemote: Inizio sincronizzazione - Path remoto: " + _remotePath);
 
             if (!Directory.Exists(_remotePath))
             {
@@ -169,17 +171,25 @@ public class MediaCache
                 return;
             }
 
+            // Prima ottieni TUTTI i file nella cartella remota
+            var allRemoteFiles = Directory.GetFiles(_remotePath);
+            Logger.Info($"SyncWithRemote: Tutti i file nella cartella remota ({allRemoteFiles.Length}):");
+            foreach (var remoteFile in allRemoteFiles.OrderBy(f => Path.GetFileName(f)))
+            {
+                Logger.Info($"  REMOTO: {Path.GetFileName(remoteFile)}");
+            }
+
             // Ottieni lista file remoti supportati
             var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
             var videoExtensions = new[] { ".mp4", ".avi", ".wmv", ".webm", ".mkv", ".mov" };
             var allExtensions = imageExtensions.Concat(videoExtensions).ToArray();
 
-            var remoteFiles = Directory.GetFiles(_remotePath)
+            var remoteFiles = allRemoteFiles
                 .Where(f => allExtensions.Contains(Path.GetExtension(f).ToLower()))
                 .Select(f => Path.GetFileName(f))
                 .ToHashSet();
 
-            Logger.Info($"SyncWithRemote: {remoteFiles.Count} file presenti nella cartella remota");
+            Logger.Info($"SyncWithRemote: File remoti supportati ({remoteFiles.Count}): {string.Join(", ", remoteFiles.OrderBy(f => f))}");
 
             // Ottieni lista file locali nella cache
             if (!Directory.Exists(_cachePath))
@@ -192,14 +202,16 @@ public class MediaCache
                 .Select(f => Path.GetFileName(f))
                 .ToList();
 
-            Logger.Info($"SyncWithRemote: {cacheFiles.Count} file presenti nella cache locale");
+            Logger.Info($"SyncWithRemote: File nella cache locale ({cacheFiles.Count}): {string.Join(", ", cacheFiles.OrderBy(f => f))}");
 
             // Elimina dalla cache i file che non esistono più nella cartella remota
+            Logger.Info("SyncWithRemote: Controllo file da eliminare:");
             int deletedCount = 0;
-            foreach (var cacheFile in cacheFiles)
+            foreach (var cacheFile in cacheFiles.OrderBy(f => f))
             {
                 if (!remoteFiles.Contains(cacheFile))
                 {
+                    Logger.Info($"  {cacheFile}: ELIMINA");
                     string fullPath = Path.Combine(_cachePath, cacheFile);
                     try
                     {
@@ -212,6 +224,10 @@ public class MediaCache
                         Logger.Warn($"SyncWithRemote: Errore eliminazione {cacheFile}: {ex.Message}");
                     }
                 }
+                else
+                {
+                    Logger.Info($"  {cacheFile}: MANTIENI");
+                }
             }
 
             Logger.Info($"SyncWithRemote: Sincronizzazione completata - eliminati {deletedCount} file orfani");
@@ -220,6 +236,22 @@ public class MediaCache
         {
             Logger.Error($"SyncWithRemote: Errore durante sincronizzazione: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Sincronizza la cache solo se è passato abbastanza tempo dall'ultima sincronizzazione
+    /// </summary>
+    public void SyncIfNeeded()
+    {
+        if (DateTime.Now - _lastSyncTime < _minSyncInterval)
+        {
+            Logger.Debug("SyncIfNeeded: Saltato - troppo presto dall'ultima sincronizzazione");
+            return;
+        }
+
+        Logger.Info("SyncIfNeeded: Eseguo sincronizzazione periodica");
+        SyncWithRemote();
+        _lastSyncTime = DateTime.Now;
     }
 
     /// <summary>

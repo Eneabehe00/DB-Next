@@ -264,12 +264,12 @@ public class MainForm : Form
                     // Mostra stato iniziale della cache
                     _mediaCache.LogCacheStatus();
 
-                    // Pulizia periodica ogni 24 ore
-                    _cacheCleanupTimer = new System.Timers.Timer(24 * 60 * 60 * 1000); // 24 ore
+                    // Pulizia periodica ogni 2 ore (ridotto perché la sincronizzazione avviene più frequentemente)
+                    _cacheCleanupTimer = new System.Timers.Timer(2 * 60 * 60 * 1000); // 2 ore invece di 24
                     _cacheCleanupTimer.Elapsed += (s, e) =>
                     {
                         _mediaCache.CleanupOldFiles();
-                        _mediaCache.SyncWithRemote();
+                        // La sincronizzazione ora avviene automaticamente in LoadMedia (ogni 5 minuti max)
                     };
                     _cacheCleanupTimer.Start();
 
@@ -660,7 +660,12 @@ public class MainForm : Form
             if (state.CurrentNumber != _lastNumber)
             {
                 _lastNumber = state.CurrentNumber;
-                this.Invoke(() => UpdateNumber(state.CurrentNumber));
+                this.Invoke(() =>
+                {
+                    UpdateNumber(state.CurrentNumber);
+                    // Sincronizza la cache quando cambia il numero
+                    _ = LoadMedia();
+                });
             }
         }
         catch (Exception ex)
@@ -926,6 +931,14 @@ public class MainForm : Form
         try
         {
             Logger.Info("LoadMedia: Inizio");
+
+            // === SINCRONIZZAZIONE LEGGERA ===
+            // Sincronizza la cache solo se siamo slave e se necessario (massimo ogni 5 minuti)
+            if (IsSlave() && _mediaCache != null)
+            {
+                _mediaCache.SyncIfNeeded();
+            }
+
             _slideshowTimer.Stop();
             _videoView.Visible = false;
             _pictureBox.Visible = true;
